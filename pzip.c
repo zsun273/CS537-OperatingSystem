@@ -2,10 +2,8 @@
 // handin version
 // 11/04 2021
 
-#include <assert.h>
 #include <fcntl.h>
 #include <pthread.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
@@ -14,27 +12,34 @@
 #include <pthread.h>
 #include <sys/sysinfo.h>
 
-int nproc = 0;
+int n_thread = 0;
 
-typedef struct zip_arg_t {
+typedef struct zip_struct {
     char *ptr;
     int offset;
     int len;
-} zip_arg_t;
+} zip_struct;
 
-typedef struct zip_ret_t {
+typedef struct zip_output {
     char   val[10000000];
     int    num[10000000];
     int    n;
-} zip_ret_t;
+} zip_output;
+
+void check_error(int return_value){
+    if (return_value < 0){
+        printf("Failed\n");
+        exit(1);
+    }
+}
 
 void *thread_zip(void *args) {
-    zip_ret_t* ret = malloc(sizeof(zip_ret_t));
+    zip_output* ret = malloc(sizeof(zip_output));
     ret->n = 0;
-
-    char *ptr = ((zip_arg_t *)args)->ptr;
-    int offset = ((zip_arg_t *)args)->offset;
-    int len = ((zip_arg_t *)args)->len;
+    zip_struct *arg = (zip_struct *) args;
+    char *ptr = arg->ptr;
+    int offset = arg->offset;
+    int len = arg->len;
     char ch = *(ptr + offset);
     int nch = 0;
 
@@ -47,7 +52,6 @@ void *thread_zip(void *args) {
             ret->n ++;
             nch = 1;
             ch = *(ptr + offset + i);
-            assert(ret->n < 10000000);
         }
     }
     // for the last char
@@ -57,13 +61,13 @@ void *thread_zip(void *args) {
     return (void*)ret;
 }
 
-void merge(char* ch, int* nch, zip_ret_t* rets[], int nthread, bool first) {
-    if (first) {
+void merge(char* ch, int* nch, zip_output* rets[], int n_thread, int first) {
+    if (first == 1) {
         (*ch) = rets[0]->val[0];
         (*nch) = 0;
     }
 
-    for (int i=0; i < nthread; i++) {
+    for (int i=0; i < n_thread; i++) {
         for (int j = 0; j <= rets[i]->n; j++) {
             if ((*ch) == rets[i]->val[j]) {
                 (*nch) += rets[i]->num[j];
@@ -78,19 +82,12 @@ void merge(char* ch, int* nch, zip_ret_t* rets[], int nthread, bool first) {
     }
 }
 
-void process(char* ch, int* nch, char *path, bool first) {
+void process(char* ch, int* nch, char *path, int first) {
     int fd = open(path, O_RDONLY);
-    if (fd < 0) {
-        printf("zip: cannot open file\n");
-        exit(1);
-    }
+    check_error(fd);
 
     struct stat st;
-    int err = fstat(fd, &st);
-    if (err < 0) {
-        printf("fstat fails\n");
-        exit(1);
-    }
+    check_error(fstat(fd, &st));
 
     int filesize = st.st_size;
     int offset = 0;
@@ -99,36 +96,29 @@ void process(char* ch, int* nch, char *path, bool first) {
         printf("mmap fails\n");
         exit(1);
     }
-    int nthread = nproc;
     int len;
-    pthread_t threads[nthread];
-    zip_arg_t args[nthread];
+    pthread_t threads[n_thread];
+    zip_struct args[n_thread];
 
     // divide the job to n_threads.
-    for (int i = 0; i < nthread; i++) {
-        len = ((i+1) * filesize / nthread) - offset;
-        args[i] = (struct zip_arg_t){ptr, offset, len};
+    for (int i = 0; i < n_thread; i++) {
+        len = ((i+1) * filesize / n_thread) - offset;
+        args[i] = (zip_struct){ptr, offset, len};
         pthread_create(&threads[i], NULL, thread_zip, &args[i]);
         offset += len;
     }
 
-    zip_ret_t* rets[nthread];
-    for (int i = 0; i < nthread; i++) {
+    zip_output* rets[n_thread];
+    for (int i = 0; i < n_thread; i++) {
         pthread_join(threads[i], (void*)(&rets[i]));
     }
 
-    merge(ch, nch, rets, nthread, first);
+    merge(ch, nch, rets, n_thread, first);
 
-    for (int i = 0; i < nthread; i++) {
+    for (int i = 0; i < n_thread; i++) {
         free(rets[i]);
     }
-
-    err = munmap(ptr, filesize);
-    if (err != 0) {
-        printf("munmap fails\n");
-        exit(1);
-    }
-
+    check_error(munmap(ptr, filesize));
     close(fd);
 }
 
@@ -137,14 +127,14 @@ int main(int argc, char *argv[]) {
         printf("zip: file1 [file2 ...]\n");
         exit(1);
     }
-    nproc = get_nprocs_conf(); // can be changed to get_nprocs_conf() on lab machine
+    n_thread = get_nprocs_conf();
     // Process the first file
     char ch;
     int nch = 0;
-    process(&ch, &nch, argv[1], true);
+    process(&ch, &nch, argv[1], 1);
 
     for (int i = 2; i < argc; i++) {
-        process(&ch, &nch, argv[i], false);
+        process(&ch, &nch, argv[i], 0);
     }
     //printf("write[num: %d, val: %c]\n", nch, ch);
     fwrite(&nch, sizeof(int), 1 ,stdout);

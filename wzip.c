@@ -88,13 +88,8 @@ void merge(char* ch, int* nch, zip_ret_t* rets[], int nthread, bool first) {
             } else {
                 //printf("Process write[num: %d, val: %c]\n", (*nch), (*ch));
                 fwrite(nch, sizeof(int), 1 ,stdout);
-                if(ferror(stdout)){
-                    printf("write error");
-                    perror(__func__);
-                    exit(EXIT_FAILURE);
-                }
-                //printf("nch: %d\n", (*nch));
-                //fwrite(ch, sizeof(char), 1 ,stdout);
+                //fprintf(stdout, "%d", *nch);
+                fwrite(ch, sizeof(char), 1 ,stdout);
                 (*ch) = rets[i]->val[j];
                 (*nch) = rets[i]->num[j];
             }
@@ -158,8 +153,9 @@ void process(char* ch, int* nch, char *path, bool first) {
 }
 
 int main(int argc, char *argv[]) {
-    int test = 97;
-    fwrite(&test, sizeof(int), 1 ,stdout);
+
+    FILE *fp = open("file.z");
+    fread(fp)
 
     if (argc < 2) {
         printf("zip: file1 [file2 ...]\n");
@@ -176,7 +172,8 @@ int main(int argc, char *argv[]) {
         process(&ch, &nch, argv[i], false);
     }
     
-    printf("write[num: %d, val: %c]\n", nch, ch);
+    //printf("write[num: %d, val: %c]\n", nch, ch);
+    //fprintf(stdout, "%d", nch);
     fwrite(&nch, sizeof(int), 1 ,stdout);
     fwrite(&ch, sizeof(char), 1 ,stdout);
     return 0;
