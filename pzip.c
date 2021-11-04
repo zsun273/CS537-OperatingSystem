@@ -1,3 +1,7 @@
+// CS537 P3a: Group Memeber: Zhuocheng Sun & Gefei Shen
+// handin version
+// 11/04 2021
+
 #include <assert.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -8,30 +12,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <pthread.h>
-
-// For MacOS
-#include <sys/sysctl.h>
+#include <sys/sysinfo.h>
 
 int nproc = 0;
-
-int getNumberOfCores() {
-    int nm[2];
-    size_t len = 4;
-    uint32_t count;
-
-    nm[0] = CTL_HW;
-    nm[1] = HW_AVAILCPU;
-    sysctl(nm, 2, &count, &len, NULL, 0);
-
-    if (count < 1) {
-        nm[1] = HW_NCPU;
-        sysctl(nm, 2, &count, &len, NULL, 0);
-        if (count < 1) {
-        count = 1;
-        }
-    }
-    return count;
-}
 
 typedef struct zip_arg_t {
     char *ptr;
@@ -67,10 +50,9 @@ void *thread_zip(void *args) {
             assert(ret->n < 10000000);
         }
     }
-
     // for the last char
     ret->val[ret->n] = ch;
-    ret->num[ret->n] = nch; 
+    ret->num[ret->n] = nch;
 
     return (void*)ret;
 }
@@ -78,23 +60,17 @@ void *thread_zip(void *args) {
 void merge(char* ch, int* nch, zip_ret_t* rets[], int nthread, bool first) {
     if (first) {
         (*ch) = rets[0]->val[0];
-        (*nch) = 0; 
+        (*nch) = 0;
     }
-    
+
     for (int i=0; i < nthread; i++) {
         for (int j = 0; j <= rets[i]->n; j++) {
             if ((*ch) == rets[i]->val[j]) {
-                (*nch) += rets[i]->num[j]; 
+                (*nch) += rets[i]->num[j];
             } else {
-                //printf("Process write[num: %d, val: %c]\n", (*nch), (*ch));
+                //printf("write[num: %d, val: %c]\n", (*nch), (*ch));
                 fwrite(nch, sizeof(int), 1 ,stdout);
-                if(ferror(stdout)){
-                    printf("write error");
-                    perror(__func__);
-                    exit(EXIT_FAILURE);
-                }
-                //printf("nch: %d\n", (*nch));
-                //fwrite(ch, sizeof(char), 1 ,stdout);
+                fwrite(ch, sizeof(char), 1 ,stdout);
                 (*ch) = rets[i]->val[j];
                 (*nch) = rets[i]->num[j];
             }
@@ -123,8 +99,7 @@ void process(char* ch, int* nch, char *path, bool first) {
         printf("mmap fails\n");
         exit(1);
     }
-
-    int nthread = getNumberOfCores();
+    int nthread = nproc;
     int len;
     pthread_t threads[nthread];
     zip_arg_t args[nthread];
@@ -158,15 +133,11 @@ void process(char* ch, int* nch, char *path, bool first) {
 }
 
 int main(int argc, char *argv[]) {
-    int test = 97;
-    fwrite(&test, sizeof(int), 1 ,stdout);
-
     if (argc < 2) {
         printf("zip: file1 [file2 ...]\n");
         exit(1);
     }
-
-    nproc = getNumberOfCores(); // can be changed to get_nprocs_conf() on lab machine
+    nproc = get_nprocs_conf(); // can be changed to get_nprocs_conf() on lab machine
     // Process the first file
     char ch;
     int nch = 0;
@@ -175,8 +146,7 @@ int main(int argc, char *argv[]) {
     for (int i = 2; i < argc; i++) {
         process(&ch, &nch, argv[i], false);
     }
-    
-    printf("write[num: %d, val: %c]\n", nch, ch);
+    //printf("write[num: %d, val: %c]\n", nch, ch);
     fwrite(&nch, sizeof(int), 1 ,stdout);
     fwrite(&ch, sizeof(char), 1 ,stdout);
     return 0;
