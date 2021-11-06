@@ -139,13 +139,17 @@ int process(char* ch, int* nch, char *path, int first) {
     pthread_t threads[n_thread];
     zip_struct args[n_thread];
 
-    // divide the job to n_threads.
-    for (int i = 0; i < n_thread; i++) {
-        len = ((i+1) * filesize / n_thread) - offset;
+    int unit = 1 + filesize / n_thread;
+    for (int i = 0; i < n_thread-1; i++) {
+        len = ((i+1) * unit) - offset;
         args[i] = (zip_struct){ptr, offset, len};
         pthread_create(&threads[i], NULL, thread_zip, &args[i]);
         offset += len;
     }
+    //last thread
+    len = filesize - offset;
+    args[n_thread-1] = (zip_struct){ptr, offset, len};
+    pthread_create(&threads[n_thread-1], NULL, thread_zip, &args[n_thread-1]);
 
     zip_output* rets[n_thread];
     for (int i = 0; i < n_thread; i++) {
@@ -167,7 +171,7 @@ int main(int argc, char *argv[]) {
         printf("pzip: file1 [file2 ...]\n");
         exit(1);
     }
-    n_thread = get_nprocs_conf() * 2;
+    n_thread = get_nprocs_conf() * 5;
     // Process the first file
     char ch;
     int nch = 0;
