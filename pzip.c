@@ -41,22 +41,46 @@ void *thread_zip(void *args) {
     int offset = arg->offset;
     int len = arg->len;
     char ch = *(ptr + offset);
-    int nch = 0;
+    int first_non_nul = 0;
 
-    for (int i = 0; i < len; i++) {
-        if (*(ptr + offset + i) == ch) { // check if is repetition
+    int nch = 0;
+    for (int j = 0; j < len; j++) { // find the first non-nul char
+        ch = *(ptr + offset + j);
+        if (ch != '\0'){
+            first_non_nul = j;
+            break;
+        }
+        if (j == len-1){
+            // all null
+            return (void*)ret;
+        }
+    }
+
+    for (int i = first_non_nul; i < len; i++) {
+        char curr = *(ptr + offset + i);
+        if (curr == '\0'){
+            continue;
+        }
+        if (curr == ch) { // check if is repetition
             nch++;
         } else {
             ret->val[ret->n] = ch;
             ret->num[ret->n] = nch;
             ret->n ++;
-            nch = 1;
-            ch = *(ptr + offset + i);
+            if (curr != '\0'){
+                nch = 1;
+                ch = curr;
+            }
+
         }
     }
-    // for the last char
-    ret->val[ret->n] = ch;
-    ret->num[ret->n] = nch;
+    if (ch != '\0'){
+        // for the last char
+        ret->val[ret->n] = ch;
+        ret->num[ret->n] = nch;
+    }else{
+        ret->n --;
+    }
 
     return (void*)ret;
 }
@@ -66,13 +90,26 @@ void merge(char* ch, int* nch, zip_output* rets[], int n_thread, int first) {
         (*ch) = rets[0]->val[0];
         (*nch) = 0;
     }
-
-    for (int i=0; i < n_thread; i++) {
+    for (int i = 0; i < n_thread; i++) {
         for (int j = 0; j <= rets[i]->n; j++) {
+            if (rets[i]->val[j] == '\0') {
+                continue;
+            }
             if ((*ch) == rets[i]->val[j]) {
                 (*nch) += rets[i]->num[j];
             } else {
                 //printf("write[num: %d, val: %c]\n", (*nch), (*ch));
+
+                //DEBUG info
+//                if (*ch == '\n') printf("thread: %d, number: %d, detect new line here\n", i, j);
+//                else printf("thread: %d, number: %d\n", i, j);
+
+//                if (*ch == '\0') {
+//                    (*ch) = rets[i]->val[j];
+//                    (*nch) = rets[i]->num[j];
+//                    continue;
+//                }
+
                 fwrite(nch, sizeof(int), 1 ,stdout);
                 fwrite(ch, sizeof(char), 1 ,stdout);
                 (*ch) = rets[i]->val[j];
@@ -82,9 +119,11 @@ void merge(char* ch, int* nch, zip_output* rets[], int n_thread, int first) {
     }
 }
 
-void process(char* ch, int* nch, char *path, int first) {
+int process(char* ch, int* nch, char *path, int first) {
     int fd = open(path, O_RDONLY);
-    check_error(fd);
+    if (fd < 0){
+        return 0;
+    }
 
     struct stat st;
     check_error(fstat(fd, &st));
@@ -120,14 +159,15 @@ void process(char* ch, int* nch, char *path, int first) {
     }
     check_error(munmap(ptr, filesize));
     close(fd);
+    return 1;
 }
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
-        printf("zip: file1 [file2 ...]\n");
+        printf("pzip: file1 [file2 ...]\n");
         exit(1);
     }
-    n_thread = get_nprocs_conf();
+    n_thread = get_nprocs_conf() * 2;
     // Process the first file
     char ch;
     int nch = 0;
