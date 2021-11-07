@@ -13,30 +13,44 @@
 #include <sys/sysinfo.h>
 
 int n_thread = 0;
+//efficient loading
+int effi = 0;
 
-typedef struct zip_struct {
+typedef struct zip_struct
+{
     char *ptr;
     int offset;
     int len;
 } zip_struct;
 
-typedef struct zip_output {
-    char   val[10000000];
-    int    num[10000000];
-    int    n;
+typedef struct zip_output
+{
+    char val[100000000];
+    int num[100000000];
+    int n;
 } zip_output;
 
-void check_error(int return_value){
-    if (return_value < 0){
+typedef struct zip_output_effi
+{
+    char val[1100000];
+    int num[1100000];
+    int n;
+} zip_output_effi;
+
+void check_error(int return_value)
+{
+    if (return_value < 0)
+    {
         printf("Failed\n");
         exit(1);
     }
 }
 
-void *thread_zip(void *args) {
-    zip_output* ret = malloc(sizeof(zip_output));
+void *thread_zip(void *args)
+{
+    zip_output *ret = malloc(sizeof(zip_output));
     ret->n = 0;
-    zip_struct *arg = (zip_struct *) args;
+    zip_struct *arg = (zip_struct *)args;
     char *ptr = arg->ptr;
     int offset = arg->offset;
     int len = arg->len;
@@ -44,74 +58,145 @@ void *thread_zip(void *args) {
     int first_non_nul = 0;
 
     int nch = 0;
-    for (int j = 0; j < len; j++) { // find the first non-nul char
+    for (int j = 0; j < len; j++)
+    { // find the first non-nul char
         ch = *(ptr + offset + j);
-        if (ch != '\0'){
+        if (ch != '\0')
+        {
             first_non_nul = j;
             break;
         }
-        if (j == len-1){
+        if (j == len - 1)
+        {
             // all null
-            return (void*)ret;
+            return (void *)ret;
         }
     }
 
-    for (int i = first_non_nul; i < len; i++) {
+    for (int i = first_non_nul; i < len; i++)
+    {
         char curr = *(ptr + offset + i);
-        if (curr == '\0'){
+        if (curr == '\0')
+        {
             continue;
         }
-        if (curr == ch) { // check if is repetition
+        if (curr == ch)
+        { // check if is repetition
             nch++;
-        } else {
+        }
+        else
+        {
             ret->val[ret->n] = ch;
             ret->num[ret->n] = nch;
-            ret->n ++;
-            if (curr != '\0'){
+            ret->n++;
+            if (curr != '\0')
+            {
                 nch = 1;
                 ch = curr;
             }
-
         }
     }
-    if (ch != '\0'){
+    if (ch != '\0')
+    {
         // for the last char
         ret->val[ret->n] = ch;
         ret->num[ret->n] = nch;
-    }else{
-        ret->n --;
+    }
+    else
+    {
+        ret->n--;
     }
 
-    return (void*)ret;
+    return (void *)ret;
 }
 
-void merge(char* ch, int* nch, zip_output* rets[], int n_thread, int first) {
-    if (first == 1) {
+void *thread_zip_effi(void *args)
+{
+    zip_output_effi *ret = malloc(sizeof(zip_output_effi));
+    ret->n = 0;
+    zip_struct *arg = (zip_struct *)args;
+    char *ptr = arg->ptr;
+    int offset = arg->offset;
+    int len = arg->len;
+    char ch = *(ptr + offset);
+    int first_non_nul = 0;
+
+    int nch = 0;
+    for (int j = 0; j < len; j++)
+    { // find the first non-nul char
+        ch = *(ptr + offset + j);
+        if (ch != '\0')
+        {
+            first_non_nul = j;
+            break;
+        }
+        if (j == len - 1)
+        {
+            // all null
+            return (void *)ret;
+        }
+    }
+
+    for (int i = first_non_nul; i < len; i++)
+    {
+        char curr = *(ptr + offset + i);
+        if (curr == '\0')
+        {
+            continue;
+        }
+        if (curr == ch)
+        { // check if is repetition
+            nch++;
+        }
+        else
+        {
+            ret->val[ret->n] = ch;
+            ret->num[ret->n] = nch;
+            ret->n++;
+            if (curr != '\0')
+            {
+                nch = 1;
+                ch = curr;
+            }
+        }
+    }
+    if (ch != '\0')
+    {
+        // for the last char
+        ret->val[ret->n] = ch;
+        ret->num[ret->n] = nch;
+    }
+    else
+    {
+        ret->n--;
+    }
+
+    return (void *)ret;
+}
+
+void merge(char *ch, int *nch, zip_output *rets[], int n_thread, int first)
+{
+    if (first == 1)
+    {
         (*ch) = rets[0]->val[0];
         (*nch) = 0;
     }
-    for (int i = 0; i < n_thread; i++) {
-        for (int j = 0; j <= rets[i]->n; j++) {
-            if (rets[i]->val[j] == '\0') {
+    for (int i = 0; i < n_thread; i++)
+    {
+        for (int j = 0; j <= rets[i]->n; j++)
+        {
+            if (rets[i]->val[j] == '\0')
+            {
                 continue;
             }
-            if ((*ch) == rets[i]->val[j]) {
+            if ((*ch) == rets[i]->val[j])
+            {
                 (*nch) += rets[i]->num[j];
-            } else {
-                //printf("write[num: %d, val: %c]\n", (*nch), (*ch));
-
-                //DEBUG info
-//                if (*ch == '\n') printf("thread: %d, number: %d, detect new line here\n", i, j);
-//                else printf("thread: %d, number: %d\n", i, j);
-
-//                if (*ch == '\0') {
-//                    (*ch) = rets[i]->val[j];
-//                    (*nch) = rets[i]->num[j];
-//                    continue;
-//                }
-
-                fwrite(nch, sizeof(int), 1 ,stdout);
-                fwrite(ch, sizeof(char), 1 ,stdout);
+            }
+            else
+            {
+                fwrite(nch, sizeof(int), 1, stdout);
+                fwrite(ch, sizeof(char), 1, stdout);
                 (*ch) = rets[i]->val[j];
                 (*nch) = rets[i]->num[j];
             }
@@ -119,9 +204,41 @@ void merge(char* ch, int* nch, zip_output* rets[], int n_thread, int first) {
     }
 }
 
-int process(char* ch, int* nch, char *path, int first) {
+void merge_effi(char *ch, int *nch, zip_output_effi *rets[], int n_thread, int first)
+{
+    if (first == 1)
+    {
+        (*ch) = rets[0]->val[0];
+        (*nch) = 0;
+    }
+    for (int i = 0; i < n_thread; i++)
+    {
+        for (int j = 0; j <= rets[i]->n; j++)
+        {
+            if (rets[i]->val[j] == '\0')
+            {
+                continue;
+            }
+            if ((*ch) == rets[i]->val[j])
+            {
+                (*nch) += rets[i]->num[j];
+            }
+            else
+            {
+                fwrite(nch, sizeof(int), 1, stdout);
+                fwrite(ch, sizeof(char), 1, stdout);
+                (*ch) = rets[i]->val[j];
+                (*nch) = rets[i]->num[j];
+            }
+        }
+    }
+}
+
+int process(char *ch, int *nch, char *path, int first)
+{
     int fd = open(path, O_RDONLY);
-    if (fd < 0){
+    if (fd < 0)
+    {
         return 0;
     }
 
@@ -131,7 +248,8 @@ int process(char* ch, int* nch, char *path, int first) {
     int filesize = st.st_size;
     int offset = 0;
     char *ptr = mmap(NULL, filesize, PROT_READ, MAP_PRIVATE, fd, offset);
-    if (ptr == MAP_FAILED) {
+    if (ptr == MAP_FAILED)
+    {
         printf("mmap fails\n");
         exit(1);
     }
@@ -140,34 +258,80 @@ int process(char* ch, int* nch, char *path, int first) {
     zip_struct args[n_thread];
 
     int unit = 1 + filesize / n_thread;
-    for (int i = 0; i < n_thread-1; i++) {
-        len = ((i+1) * unit) - offset;
-        args[i] = (zip_struct){ptr, offset, len};
-        pthread_create(&threads[i], NULL, thread_zip, &args[i]);
+    for (int i = 0; i < n_thread - 1; i++)
+    {
+        len = ((i + 1) * unit) - offset;
+        if (len < 1000000)
+		effi = 1;
+	args[i] = (zip_struct){ptr, offset, len};
+        if (effi)
+        {
+            pthread_create(&threads[i], NULL, thread_zip_effi, &args[i]);
+        }
+        else
+        {
+            pthread_create(&threads[i], NULL, thread_zip, &args[i]);
+        }
         offset += len;
     }
     //last thread
     len = filesize - offset;
-    args[n_thread-1] = (zip_struct){ptr, offset, len};
-    pthread_create(&threads[n_thread-1], NULL, thread_zip, &args[n_thread-1]);
-
-    zip_output* rets[n_thread];
-    for (int i = 0; i < n_thread; i++) {
-        pthread_join(threads[i], (void*)(&rets[i]));
+    args[n_thread - 1] = (zip_struct){ptr, offset, len};
+    if (effi)
+    {
+        pthread_create(&threads[n_thread - 1], NULL, thread_zip_effi, &args[n_thread - 1]);
+    }
+    else
+    {
+        pthread_create(&threads[n_thread - 1], NULL, thread_zip, &args[n_thread - 1]);
     }
 
-    merge(ch, nch, rets, n_thread, first);
+    
+    zip_output_effi *rets_effi[n_thread];
+    zip_output *rets[n_thread];
 
-    for (int i = 0; i < n_thread; i++) {
-        free(rets[i]);
+    if (effi)
+    {
+        for (int i = 0; i < n_thread; i++)
+        {
+            pthread_join(threads[i], (void *)(&rets_effi[i]));
+        }
     }
+    else
+    {
+        for (int i = 0; i < n_thread; i++)
+        {
+            pthread_join(threads[i], (void *)(&rets[i]));
+        }
+    }
+
+    if (effi)
+    {
+        merge_effi(ch, nch, rets_effi, n_thread, first);
+    }
+    else
+    {
+        merge(ch, nch, rets, n_thread, first);
+    }
+
+    for (int i = 0; i < n_thread; i++)
+    {
+        if (effi) {
+		free(rets_effi[i]);
+	} else {
+		free(rets[i]);
+	}
+    }
+
     check_error(munmap(ptr, filesize));
     close(fd);
     return 1;
 }
 
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
+int main(int argc, char *argv[])
+{
+    if (argc < 2)
+    {
         printf("pzip: file1 [file2 ...]\n");
         exit(1);
     }
@@ -177,11 +341,12 @@ int main(int argc, char *argv[]) {
     int nch = 0;
     process(&ch, &nch, argv[1], 1);
 
-    for (int i = 2; i < argc; i++) {
+    for (int i = 2; i < argc; i++)
+    {
         process(&ch, &nch, argv[i], 0);
     }
     //printf("write[num: %d, val: %c]\n", nch, ch);
-    fwrite(&nch, sizeof(int), 1 ,stdout);
-    fwrite(&ch, sizeof(char), 1 ,stdout);
+    fwrite(&nch, sizeof(int), 1, stdout);
+    fwrite(&ch, sizeof(char), 1, stdout);
     return 0;
 }
