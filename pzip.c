@@ -14,7 +14,7 @@
 
 int n_thread = 0;
 //efficient loading
-int effi = 0;
+int effi = 1;
 
 typedef struct zip_struct
 {
@@ -25,15 +25,15 @@ typedef struct zip_struct
 
 typedef struct zip_output
 {
-    char val[100000000];
-    int num[100000000];
+    char val[10000000];
+    int num[10000000];
     int n;
 } zip_output;
 
 typedef struct zip_output_effi
 {
-    char val[1100000];
-    int num[1100000];
+    char val[1000000];
+    int num[1000000];
     int n;
 } zip_output_effi;
 
@@ -261,8 +261,8 @@ int process(char *ch, int *nch, char *path, int first)
     for (int i = 0; i < n_thread - 1; i++)
     {
         len = ((i + 1) * unit) - offset;
-        if (len < 1000000)
-		effi = 1;
+        if (len > 1000000)
+		effi = 0;
 	args[i] = (zip_struct){ptr, offset, len};
         if (effi)
         {
@@ -276,6 +276,8 @@ int process(char *ch, int *nch, char *path, int first)
     }
     //last thread
     len = filesize - offset;
+    if (len > 1000000)
+	    effi = 0;
     args[n_thread - 1] = (zip_struct){ptr, offset, len};
     if (effi)
     {
