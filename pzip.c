@@ -25,8 +25,8 @@ typedef struct zip_struct
 
 typedef struct zip_output
 {
-    char val[10000000];
-    int num[10000000];
+    char val[50000000];
+    int num[50000000];
     int n;
 } zip_output;
 
@@ -257,13 +257,13 @@ int process(char *ch, int *nch, char *path, int first)
     pthread_t threads[n_thread];
     zip_struct args[n_thread];
 
-    int unit = 1 + filesize / n_thread;
+    int unit = filesize / n_thread;
+    if (unit > 1000000)
+        effi = 0;
     for (int i = 0; i < n_thread - 1; i++)
     {
-        len = ((i + 1) * unit) - offset;
-        if (len > 1000000)
-		effi = 0;
-	args[i] = (zip_struct){ptr, offset, len};
+        len = unit;
+        args[i] = (zip_struct){ptr, offset, len};
         if (effi)
         {
             pthread_create(&threads[i], NULL, thread_zip_effi, &args[i]);
@@ -276,8 +276,6 @@ int process(char *ch, int *nch, char *path, int first)
     }
     //last thread
     len = filesize - offset;
-    if (len > 1000000)
-	    effi = 0;
     args[n_thread - 1] = (zip_struct){ptr, offset, len};
     if (effi)
     {
@@ -288,7 +286,7 @@ int process(char *ch, int *nch, char *path, int first)
         pthread_create(&threads[n_thread - 1], NULL, thread_zip, &args[n_thread - 1]);
     }
 
-    
+
     zip_output_effi *rets_effi[n_thread];
     zip_output *rets[n_thread];
 
@@ -319,10 +317,10 @@ int process(char *ch, int *nch, char *path, int first)
     for (int i = 0; i < n_thread; i++)
     {
         if (effi) {
-		free(rets_effi[i]);
-	} else {
-		free(rets[i]);
-	}
+            free(rets_effi[i]);
+        } else {
+            free(rets[i]);
+        }
     }
 
     check_error(munmap(ptr, filesize));
@@ -330,25 +328,26 @@ int process(char *ch, int *nch, char *path, int first)
     return 1;
 }
 
-int main(int argc, char *argv[])
-{
-    if (argc < 2)
-    {
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
         printf("pzip: file1 [file2 ...]\n");
         exit(1);
     }
-    n_thread = get_nprocs_conf() * 5;
+    n_thread = get_nprocs_conf();
     // Process the first file
     char ch;
     int nch = 0;
-    process(&ch, &nch, argv[1], 1);
+    int valid;
+    valid = process(&ch, &nch, argv[1], 1);
 
-    for (int i = 2; i < argc; i++)
-    {
-        process(&ch, &nch, argv[i], 0);
+    for (int i = 2; i < argc; i++) {
+        if (valid == 0){
+            valid = process(&ch, &nch, argv[i], 1);
+        } else{
+            process(&ch, &nch, argv[i], 0);
+        }
     }
-    //printf("write[num: %d, val: %c]\n", nch, ch);
-    fwrite(&nch, sizeof(int), 1, stdout);
-    fwrite(&ch, sizeof(char), 1, stdout);
+    fwrite(&nch, sizeof(int), 1 ,stdout);
+    fwrite(&ch, sizeof(char), 1 ,stdout);
     return 0;
 }
