@@ -17,13 +17,13 @@ int n_thread = 0;
 
 typedef struct zip_struct {
     char *ptr;
-    int offset;
-    int len;
+    long int offset;
+    long int len;
 } zip_struct;
 
 typedef struct zip_output {
-    char   val[10000000];
-    int    num[10000000];
+    char   val[100000000];
+    int    num[100000000];
     int    n;
 } zip_output;
 
@@ -59,8 +59,9 @@ void *thread_zip(void *args) {
     ret->n = 0;
     zip_struct *arg = (zip_struct *) args;
     char *ptr = arg->ptr;
-    int offset = arg->offset;
-    int len = arg->len;
+    long int offset = arg->offset;
+    long int len = arg->len;
+    //printf("len: %ld, offset: %ld\n", len, offset);
     char ch = *(ptr + offset);
     int first_non_nul = 0;
 
@@ -151,23 +152,30 @@ int process(char* ch, int* nch, char *path, int first) {
     check_error(fstat(fd, &st));
 
     int filesize = st.st_size;
-    int offset = 0;
+    long int offset = 0;
     char *ptr = mmap(NULL, filesize, PROT_READ, MAP_PRIVATE, fd, offset);
     if (ptr == MAP_FAILED) {
         printf("mmap fails\n");
         exit(1);
     }
-    int len;
+    long int len;
     pthread_t threads[n_thread];
     zip_struct args[n_thread];
-
+    //printf("filesize: %d\n", filesize);
     // divide the job to n_threads.
-    for (int i = 0; i < n_thread; i++) {
-        len = ((i+1) * filesize / n_thread) - offset;
+    int unit = filesize / n_thread;
+    for (int i = 0; i < n_thread-1; i++) {
+        len = unit;
         args[i] = (zip_struct){ptr, offset, len};
+        //printf("start %d: len: %d, offset: %ld\n", i, len, offset);
         pthread_create(&threads[i], NULL, thread_zip, &args[i]);
         offset += len;
     }
+    //last thread
+    len = filesize - offset;
+    args[n_thread-1] = (zip_struct){ptr, offset, len};
+    //printf("start %d: len: %d, offset: %ld\n", n_thread-1, len, offset);
+    pthread_create(&threads[n_thread-1], NULL, thread_zip, &args[n_thread-1]);
 
     zip_output* rets[n_thread];
     for (int i = 0; i < n_thread; i++) {
@@ -189,7 +197,31 @@ int main(int argc, char *argv[]) {
         printf("pzip: file1 [file2 ...]\n");
         exit(1);
     }
-    n_thread = getNumberOfCores() * 5;
+    n_thread = 1; //getNumberOfCores() * 5;
+    // Process the first file
+    char ch;
+    int nch = 0;
+    process(&ch, &nch, argv[1], 1);
+
+    for (int i = 2; i < argc; i++) {
+        process(&ch, &nch, argv[i], 0);
+    }
+    //printf("write[num: %d, val: %c]\n", nch, ch);
+    fwrite(&nch, sizeof(int), 1 ,stdout);
+    fwrite(&ch, sizeof(char), 1 ,stdout);
+    return 0;
+}
+
+int main1() {
+    int argc = 2;
+    char* argv[2];
+    argv[1] = "/Users/lsun/537p3/p3a-data/bigUniqFile";
+    //argv[1] = "/Users/lsun/537p3/2.txt";
+    if (argc < 2) {
+        printf("pzip: file1 [file2 ...]\n");
+        exit(1);
+    }
+    n_thread = 1; //getNumberOfCores();
     // Process the first file
     char ch;
     int nch = 0;
