@@ -5,11 +5,11 @@
 
 // server code
 int main(int argc, char *argv[]) {
-    int sd = UDP_Open(10000);
+    int sd = UDP_Open(10000);  // use a port-number to open
     assert(sd > -1);
     while (1) {
 	struct sockaddr_in addr;
-	char message[BUFFER_SIZE];
+	char message[BUFFER_SIZE]; // TODO: this need to be changed to struct
 	printf("server:: waiting...\n");
 	int rc = UDP_Read(sd, &addr, message, BUFFER_SIZE);
 	printf("server:: read message [size:%d contents:(%s)]\n", rc, message);

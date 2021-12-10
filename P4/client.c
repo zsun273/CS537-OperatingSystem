@@ -3,7 +3,7 @@
 
 #define BUFFER_SIZE (1000)
 
-// client code
+// client code, fill in an address before sending messages
 int main(int argc, char *argv[]) {
     struct sockaddr_in addrSnd, addrRcv;
 
