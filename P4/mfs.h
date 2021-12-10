@@ -35,6 +35,11 @@ typedef struct __MFS_inode_t {
     int blockArr[14]; // point to 4KB block
 } MFS_inode_t;
 
+//struct for directories blocks, one block can fit 128 directories
+typedef struct __MFS_dir_t {
+    MFS_DirEnt_t dirArr[128];
+} MFS_dir_t;
+
 typedef enum __MFS_lib_t {
     INIT,
     LOOKUP,
