@@ -1,18 +1,25 @@
 #include <stdio.h>
 #include <string.h>
-
 #include "udp.h"
 #include "mfs.h"
-
 
 #define BUFFER_SIZE (4096)
 
 int init_image(char *name); // function to initialize the file image
 int load_mem();             // load check point, inode map into memory
+int set_return_number();    // set the return number for message
+int server_Lookup(int pinum, char *name);
+int server_Stat(int inum, MFS_Stat_t *m);
+int server_Write(int inum, char *buffer, int block);
+int server_Read(int inum, char *buffer, int block);
+int server_Creat(int pinum, int type, char *name);
+int server_Unlink(int pinum, char *name);
+int server_Shutdown();
 
 
 char name[256]; // TODO: not sure about this size
 MFS_checkpoint_t CR;
+int fd;
 
 // server code
 int main(int argc, char *argv[]) {
@@ -22,7 +29,7 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     int port_num = atoi(argv[1]);
-    // name = argv[2];       // assign file image to name
+    //sprintf(name, argv[2]);       // assign file image to name
 
     int sd = UDP_Open(port_num);  // use a port-number to open
     assert(sd > -1);
@@ -38,9 +45,8 @@ int main(int argc, char *argv[]) {
         int rc = UDP_Read(sd, &addr, message, sizeof(MFS_Msg_t));
         printf("server:: read message [size:%d contents:(%s)]\n", rc, message);
         if (rc > 0) {
-            // TODO: determine request type
-            char reply[sizeof(MFS_Msg_t)];
-            rc = UDP_Write(sd, &addr, reply, sizeof(MFS_Msg_t));
+            set_return_number(message);
+            rc = UDP_Write(sd, &addr, message, sizeof(MFS_Msg_t));
             printf("server:: reply\n");
         }
     }
@@ -105,5 +111,72 @@ int init_image(char* name){
 }
 
 int load_mem(){
+    return 0;
+}
+
+int set_return_number(char* message){
+    msg_t *msg = (msg_t*) message;
+    msg->returnNum = -1;
+
+    int returnNum;
+    switch(msg->lib) {
+        case INIT:
+            msg->returnNum = init_image(name);
+            break;
+        case LOOKUP:
+            msg->returnNum = server_Lookup(msg->pinum, msg->name);
+            break;
+        case STAT:
+            msg->returnNum = server_Stat(msg->inum, &(msg->stat));
+            break;
+        case WRITE:
+            msg->returnNum = server_Write(msg->inum, msg->buffer, msg->block);
+            break;
+        case READ:
+            msg->returnNum = server_Read(msg->inum, msg->buffer, msg->block);
+            break;
+        case CREAT:
+            msg->returnNum = server_Create(msg->pinum, msg->type, msg->name);
+            break;
+        case UNLINK:
+            msg->returnNum = server_Unlink(msg->pinum, msg->name);
+            break;
+        case SHUTDOWN:
+            msg->returnNum = 0;
+            memcpy(message, msg, sizeof(*msg));
+            UDP_Write(sd, &s, message, sizeof(msg_t));
+            fsync(fd);
+            close(fd);
+            exit(0);
+            break;
+    }
+    memcpy(message, msg, sizeof(*msg));
+}
+
+int server_Lookup(int pinum, char *name){
+    return 0;
+}
+
+int server_Stat(int inum, MFS_Stat_t *m){
+    return 0;
+}
+
+int server_Write(int inum, char *buffer, int block){
+    return 0;
+}
+
+int server_Read(int inum, char *buffer, int block){
+    return 0;
+}
+
+int server_Creat(int pinum, int type, char *name){
+    return 0;
+}
+
+int server_Unlink(int pinum, char *name){
+    return 0;
+}
+
+int server_Shutdown(){
     return 0;
 }
