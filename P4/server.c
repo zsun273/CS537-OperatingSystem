@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <string.h>
+
 #include "udp.h"
 #include "mfs.h"
 
@@ -20,13 +22,13 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     int port_num = atoi(argv[1]);
-    sprintf(name, argv[2]);       // assign file image to name
+    // name = argv[2];       // assign file image to name
 
     int sd = UDP_Open(port_num);  // use a port-number to open
     assert(sd > -1);
 
     // initialize the image file
-    init_image(name);
+    init_image(argv[2]);
     load_mem();
 
     while (1) {
@@ -78,14 +80,14 @@ int init_image(char* name){
         MFS_dir_t root_dir;
         for (int i = 0; i < 128; ++i) {
             root_dir.dirArr[i].inum = -1;
-            sprintf(root_dir.dirArr[i].name, "\0");
+            sprintf(root_dir.dirArr[i].name, "x");
         }
 
         // initialize two directory entries
         root_dir.dirArr[0].inum = 0;
-        sprintf(root_dir.dirArr[0].name, ".\0");
+        sprintf(root_dir.dirArr[0].name, ".");
         root_dir.dirArr[1].inum = 0;
-        sprintf(root_dir.dirArr[1].name, "..\0")
+        sprintf(root_dir.dirArr[1].name, "..");
 
         lseek(fd, 0, SEEK_SET); // set the file offset to 0
         write(fd, &CR, sizeof(MFS_checkpoint_t));
