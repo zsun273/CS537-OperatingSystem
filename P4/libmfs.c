@@ -18,7 +18,7 @@ int MFS_Init(char *hostname, int port) {
 //
 //    int rc = UDP_FillSockAddr(&addr, hostname, portNum);
 //    assert(rc == 0);
-    printf("init %s %d\n", hostname, port);
+    printf("init2 %s %d\n", hostname, port);
     return 0;
 }
 
