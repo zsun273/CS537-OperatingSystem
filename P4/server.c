@@ -20,6 +20,8 @@ int server_Shutdown();
 char name[256]; // TODO: not sure about this size
 MFS_checkpoint_t CR;
 int fd;
+int sd;
+struct sockaddr_in s;
 
 // server code
 int main(int argc, char *argv[]) {
@@ -39,7 +41,7 @@ int main(int argc, char *argv[]) {
     load_mem();
 
     while (1) {
-	    struct sockaddr_in addr;
+	struct sockaddr_in addr;
         char message[sizeof(MFS_Msg_t)];
         printf("server:: waiting...\n");
         int rc = UDP_Read(sd, &addr, message, sizeof(MFS_Msg_t));
@@ -115,10 +117,10 @@ int load_mem(){
 }
 
 int set_return_number(char* message){
-    msg_t *msg = (msg_t*) message;
+    MFS_Msg_t *msg = (MFS_Msg_t*) message;
     msg->returnNum = -1;
 
-    int returnNum;
+    // int returnNum;
     switch(msg->lib) {
         case INIT:
             msg->returnNum = init_image(name);
@@ -136,7 +138,7 @@ int set_return_number(char* message){
             msg->returnNum = server_Read(msg->inum, msg->buffer, msg->block);
             break;
         case CREAT:
-            msg->returnNum = server_Create(msg->pinum, msg->type, msg->name);
+            msg->returnNum = server_Creat(msg->pinum, msg->type, msg->name);
             break;
         case UNLINK:
             msg->returnNum = server_Unlink(msg->pinum, msg->name);
@@ -144,13 +146,15 @@ int set_return_number(char* message){
         case SHUTDOWN:
             msg->returnNum = 0;
             memcpy(message, msg, sizeof(*msg));
-            UDP_Write(sd, &s, message, sizeof(msg_t));
+            UDP_Write(sd, &s, message, sizeof(MFS_Msg_t));
             fsync(fd);
             close(fd);
             exit(0);
             break;
     }
+
     memcpy(message, msg, sizeof(*msg));
+    return 0;
 }
 
 int server_Lookup(int pinum, char *name){

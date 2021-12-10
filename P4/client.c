@@ -25,7 +25,6 @@ int main(int argc, char *argv[]) {
     rc = UDP_Read(sd, &addrRcv, message, sizeof(MFS_Msg_t));
     printf("client:: got reply [size:%d contents:(%s)\n", rc, message);
 
-    int rc = MFS_Init("royal-01.cs.wisc.edu", 10000);
 
     return 0;
 }
