@@ -19,9 +19,10 @@ int server_Shutdown();
 
 char name[256]; // TODO: not sure about this size
 MFS_checkpoint_t CR;
-int fd;
+int fd;         // file descriptor
 int sd;
 struct sockaddr_in s;
+MFS_inodeArr_t all_inodes;
 
 // server code
 int main(int argc, char *argv[]) {
@@ -113,6 +114,28 @@ int init_image(char* name){
 }
 
 int load_mem(){
+    lseek(fd, 0, SEEK_SET);
+    read(fd, &CR, sizeof(MFS_checkpoint_t));
+
+    for(int i = 0; i < 4096; i++) {
+        all_inodes.inodeArr[i] = -1;
+    }
+
+    // store all inode info into all_inode array
+    int k = 0;
+    MFS_imap_t imap_copy;
+    for(int i = 0; i < 256; i++) {
+        if(CR.imap[i] >= 0) {
+            lseek(fd, CR.imap[i], SEEK_SET);
+            read(fd, &imap_copy, sizeof(MFS_imap_t));
+            for(int j = 0; j < 16; j++) {
+                if(imap_copy.inodeArr[j] >= 0) {
+                    all_inodes.inodeArr[k] = imap_copy.inodeArr[j];
+                }
+                k++;
+            }
+        }
+    }
     return 0;
 }
 
@@ -120,7 +143,6 @@ int set_return_number(char* message){
     MFS_Msg_t *msg = (MFS_Msg_t*) message;
     msg->returnNum = -1;
 
-    // int returnNum;
     switch(msg->lib) {
         case INIT:
             msg->returnNum = init_image(name);
@@ -150,7 +172,6 @@ int set_return_number(char* message){
             fsync(fd);
             close(fd);
             exit(0);
-            break;
     }
 
     memcpy(message, msg, sizeof(*msg));
@@ -166,10 +187,38 @@ int server_Stat(int inum, MFS_Stat_t *m){
 }
 
 int server_Write(int inum, char *buffer, int block){
+    if (inum < 0 || inum >= 4096) return -1;
+    if (block < 0 || block > 16) return -1;
+
+    load_mem();
+    if (all_inodes.inodeArr[inum] == -1) return -1;
+
+    // read in the inode
+    MFS_inode_t inode;
+    lseek(fd, all_inodes.inodeArr[inum], SEEK_SET);
+    read(fd, &inode, sizeof(MFS_inode_t));
+    if (inode.type != MFS_REGULAR_FILE) return -1;
+
+    // TODO: write to the end of log
     return 0;
 }
 
 int server_Read(int inum, char *buffer, int block){
+    if (inum < 0 || inum >= 4096) return -1;
+    if (block < 0 || block > 16) return -1;
+
+    load_mem();
+    if (all_inodes.inodeArr[inum] == -1) return -1;
+
+    // read in the inode
+    MFS_inode_t inode;
+    lseek(fd, all_inodes.inodeArr[inum], SEEK_SET);
+    read(fd, &inode, sizeof(MFS_inode_t));
+
+    // read in the data block to buffer
+    lseek(fd, inode.blockArr[block], SEEK_SET);
+    read(fd, buffer, BUFFER_SIZE);
+
     return 0;
 }
 
@@ -182,5 +231,7 @@ int server_Unlink(int pinum, char *name){
 }
 
 int server_Shutdown(){
+    close(fd);
+    exit(0);
     return 0;
 }
