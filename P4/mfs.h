@@ -40,6 +40,11 @@ typedef struct __MFS_dir_t {
     MFS_DirEnt_t dirArr[128];
 } MFS_dir_t;
 
+// struct to store all inodes
+typedef struct __MFS_inodeArr_t{
+    int inodeArr[4096];
+} MFS_inodeArr_t;
+
 typedef enum __MFS_lib_t {
     INIT,
     LOOKUP,
