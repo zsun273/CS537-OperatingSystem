@@ -11,15 +11,15 @@ client: client.o udp.o
 	$(CC) -o client client.o udp.o  libmfs.so
 
 libmfs: udp.o mfs.o
-	$(CC) -shared -g -Wall -o libmfs.so udp.o mfs.o
+	$(CC) -shared -g -Wall -o libmfs.so udp.o libmfs.o
 udp.o:
 	$(CC) $(OPTS) -c -fpic udp.c -o udp.o
 mfs.o:
-	$(CC) $(OPTS) -c -fpic mfs.c -o mfs.o
+	$(CC) $(OPTS) -c -fpic libmfs.c -o libmfs.o
 
 # this is a generic rule for .o files 
 %.o: %.c 
 	$(CC) $(OPTS) -c $< -o $@
 
 clean:
-	rm -f server.o udp.o client.o server client libmfs.so mfs.o
+	rm -f server.o udp.o client.o server client libmfs.so libmfs.o
