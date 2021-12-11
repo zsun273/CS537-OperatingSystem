@@ -199,7 +199,28 @@ int server_Write(int inum, char *buffer, int block){
     read(fd, &inode, sizeof(MFS_inode_t));
     if (inode.type != MFS_REGULAR_FILE) return -1;
 
-    // TODO: write to the end of log
+    if(inode.blockArr[block] != -1){ // data exist, we need to overwrite the data block
+        lseek(fd, all_inodes.inodeArr[inum], SEEK_SET);
+        write(fd, &inode, sizeof(MFS_inode_t));
+        lseek(fd, inode.blockArr[block], SEEK_SET);
+        write(fd, buffer, BUFFER_SIZE);
+    }
+    else{
+        int end = CR.endOfLog;
+        CR.endOfLog += BUFFER_SIZE;
+        lseek(fd, 0, SEEK_SET);
+        write(fd, &CR, sizeof(MFS_checkpoint_t));
+
+        inode.blockArr[block] = end;
+        inode.size += BUFFER_SIZE;
+        lseek(fd, all_inodes.inodeArr[inum], SEEK_SET);
+        write(fd, &inode, sizeof(MFS_inode_t));
+
+        lseek(fd, CR.endOfLog, SEEK_SET);
+        write(fd, buffer, BUFFER_SIZE);
+    }
+
+    load_mem();
     return 0;
 }
 
