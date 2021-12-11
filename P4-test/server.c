@@ -27,9 +27,7 @@ int fdDisk;
 checkpoint_t chkpt;
 inodeArr_t iArr;
 
-int
-main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     if(argc != 3) {
         fprintf(stderr, "Usage: server <port> <file image>\n");
         exit(0);
@@ -154,7 +152,6 @@ int initImage(char *imgName) {
             j++;
             k++;
         }
-        ;
     }
     
     
@@ -164,64 +161,49 @@ int initImage(char *imgName) {
     return 0;
 }
 
-//load mem
 int loadMem() {
-    //first go and read checkpoint region
-    lseek(fdDisk, 0, 0);
+    lseek(fdDisk, 0, SEEK_SET);
     read(fdDisk, &chkpt, sizeof(checkpoint_t));
-    
-    //load imap into mem
-    int i = 0;
-    int j = 0;
-    int k = 0;
-    
-    for(i = 0; i < 4096; i++) {
+
+    for(int i = 0; i < 4096; i++) {
         iArr.inodeArr[i] = -1;
     }
-    
+
+    //store all inode info
+    int k = 0;
     imap_t imapTemp;
-    for(i = 0; i < 256; i++) {
+    for(int i = 0; i < 256; i++) {
         if(chkpt.imap[i] >= 0) {
             lseek(fdDisk, chkpt.imap[i], 0);
             read(fdDisk, &imapTemp, sizeof(imap_t));
-            for(j = 0; j < 16; j++) {
+            for(int j = 0; j < 16; j++) {
                 if(imapTemp.inodeArr[j] >= 0) {
                     iArr.inodeArr[k] = imapTemp.inodeArr[j];
-                    k++;
                 }
+                k++;
             }
-            
         }
     }
-    
     return 0;
 }
 
 int sRead(int inum, char *buff, int blk) {
-    if(inum >= 4096 || inum < 0) {
-        return -1;
-    }
-    
-    if(blk > 13 || blk < 0) {
-        return -1;
-    }
+    if(inum >= 4096 || inum < 0) return -1;
+    if(blk > 13 || blk < 0) return -1;
     
     loadMem();
     
-    if(iArr.inodeArr[inum] == -1) {
-        return -1;
-    }
-    
+    if(iArr.inodeArr[inum] == -1) return -1;
+
+    // read in the inode
     inode_t inode;
-    lseek(fdDisk, iArr.inodeArr[inum], 0);
+    lseek(fdDisk, iArr.inodeArr[inum], SEEK_SET);
     read(fdDisk, &inode, sizeof(inode_t));
     
-    if(inode.blockArr[blk] == -1) {
-        return -1;
-    }
+    if(inode.blockArr[blk] == -1) return -1;
     
-    lseek(fdDisk, inode.blockArr[blk], 0);
-    read(fdDisk, buff, 4096);
+    lseek(fdDisk, inode.blockArr[blk], SEEK_SET);
+    read(fdDisk, buff, BUFFER_SIZE);
     return 0;
 }
 
@@ -718,7 +700,6 @@ void handle(char * msgBuff) {
     memcpy(msgBuff, msg, sizeof(*msg));
 }
 
-//shutdown server
 int shutDown() {
     close(fdDisk);
     exit(0);
