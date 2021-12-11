@@ -1,31 +1,54 @@
 #include <stdio.h>
-#include "mfs.h"
 #include "udp.h"
+#include "mfs.h"
 
 #define BUFFER_SIZE (4096)
+char buffer[BUFFER_SIZE];
 
-// client code, fill in an address before sending messages
 int main(int argc, char *argv[]) {
-    struct sockaddr_in addrSnd, addrRcv;
 
-    int sd = UDP_Open(20000);
-    int rc = UDP_FillSockAddr(&addrSnd, "localhost", 10000);
+    char *host[1024];
+    //null terminated
+    host[1023] = '\0';
+    gethostname((char*)host, 1023);
 
-    char message[sizeof(MFS_Msg_t)];
-    sprintf(message, "defined type struct");
+    int rc = MFS_Init(host, 10000);
 
-    printf("client:: send message [%s]\n", message);
-    rc = UDP_Write(sd, &addrSnd, message, sizeof(MFS_Msg_t));
-    if (rc < 0) {
-	    printf("client:: failed to send\n");
-	    exit(1);
+    assert(rc == 0);
+
+    rc = MFS_Creat(0, 1, "dir1\0");
+
+    char *buff = malloc(4096);
+    sprintf(buff, "start block");
+    rc = MFS_Write(1, buff, 0);
+    assert(rc == 0);
+
+    char *retBuff = malloc(4096);
+    rc = MFS_Read(1, retBuff, 0);
+    if(strcmp(retBuff, buff) != 0) {
+        exit(-1);
     }
 
-    printf("client:: wait for reply...\n");
-    rc = UDP_Read(sd, &addrRcv, message, sizeof(MFS_Msg_t));
-    printf("client:: got reply [size:%d contents:(%s)\n", rc, message);
+    int i;
+    for(i = 0; i < 4096; i++) {
+        if(retBuff[i] != buff[i]) {
+            exit(-1);
+        }
+    }
+    char str[4096 * 2];
 
+    //write down num
+    for(i = 0; i < 420; i++) {
+        sprintf(str + strlen(str), "%d\n", i);
+    }
+    rc = MFS_Write(1, str, 2);
+    assert(rc == 0);
 
+    rc = MFS_Read(1, retBuff, 2);
+
+    if(strcmp(retBuff, str) != 0) {
+        return -1;
+    }
+    rc = MFS_Shutdown();
     return 0;
 }
-
