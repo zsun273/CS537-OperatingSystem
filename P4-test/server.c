@@ -32,32 +32,26 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Usage: server <port> <file image>\n");
         exit(0);
     }
-    
     int portNum = atoi(argv[1]);
-    sprintf(name, argv[2]);
-    
-    //get port open
-    
-    sd = UDP_Open(portNum);
+    //sprintf(name, argv[2]);
+
+    sd = UDP_Open(portNum); // use a port number to open
     assert(sd > -1);
     
-    printf("SERVER:: waiting in loop\n");
-    
     //init the server image
-    initImage(name);
+    initImage(argv[2]);
     loadMem();
     
     while (1) {
-        struct sockaddr_in n;
-        s = n;
         char buffer[sizeof(msg_t)];
+        printf("server:: waiting...\n");
         int rc = UDP_Read(sd, &s, buffer, sizeof(msg_t));
         if (rc > 0) {
             handle(buffer);
             rc = UDP_Write(sd, &s, buffer, sizeof(msg_t));
+            printf("server:: reply\n");
         }
     }
-    
     return 0;
 }
 
@@ -355,17 +349,11 @@ int sUnlink(int pinum, char *name) {
 }
 
 int sStat(int inum, MFS_Stat_t *m) {
-    
-    //check for errors
-    if(inum < 0 || inum >= 4096 || fdDisk < 0) {
-        return -1;
-    }
+    if(inum < 0 || inum >= 4096 ) return -1;
+    if (fdDisk < 0) return -1;
     loadMem();
-    
-    
-    if(iArr.inodeArr[inum] == -1) {
-        return -1;
-    }
+
+    if(iArr.inodeArr[inum] == -1) return -1;
     
     inode_t inode;
     lseek(fdDisk, iArr.inodeArr[inum], 0);
@@ -378,51 +366,31 @@ int sStat(int inum, MFS_Stat_t *m) {
 }
 
 int sLookup(int pinum, char *name) {
-    //check pinum
-    if(pinum < 0 || pinum >= 4096) {
-        return -1;
-    }
+    if(pinum < 0 || pinum >= 4096) return -1;
+    if(strlen(name) < 1 || strlen(name) > 60) return -1; // TODO: name should be at most 28 bytes
     loadMem();
-    //check if pinum in iArr is valid
-    if(iArr.inodeArr[pinum] == -1) {
-        return -1;
-    }
-    
-    ////check if the name is valid
-    if(strlen(name) < 1 || strlen(name) > 60) {
-        return -1;
-    }
+    //check if parent inode number  is valid
+    if(iArr.inodeArr[pinum] == -1) return -1;
 
-    int i;
-    int j;
-    int dirBlk;
-    
-    int pinumLoc = iArr.inodeArr[pinum];
-    
-    //lseek to pinum location
-    lseek(fdDisk, pinumLoc, 0);
-    
+    //read the parent inode
     inode_t pInode;
+    lseek(fdDisk, iArr.inodeArr[pinum], 0);
     read(fdDisk, &pInode, sizeof(pInode));
-    
-    //check if directory
-    if(pInode.stat.type != 0) {
-        return -1;
-    }
-    
-    for(i = 0; i < 14; i++) {
+    if(pInode.stat.type != MFS_DIRECTORY) return -1;
+
+    int dirBlk;
+    for(int i = 0; i < 14; i++) {
         dirBlk = pInode.blockArr[i];
         lseek(fdDisk, dirBlk, 0);
         dir_t dirBlkTmp;
         read(fdDisk, &dirBlkTmp, sizeof(dir_t));
-        for(j = 0; j < 64; j++) {
-            if(strncmp(dirBlkTmp.dirArr[j].name, name, 60) == 0) {
+        for(int j = 0; j < 64; j++) { // TODO: upper bound should be 128
+            // find the matched name and return
+            if(strcmp(dirBlkTmp.dirArr[j].name, name) == 0) {
                 return dirBlkTmp.dirArr[j].inum;
             }
         }
     }
-    
-    //if can't find name, return -1
     return -1;
 }
 
@@ -654,36 +622,28 @@ int cInode(int pinum, int type) {
 void handle(char * msgBuff) {
     msg_t *msg = (msg_t*) msgBuff;
     msg->returnNum = -1;
-    
-    int returnNum;
+
     switch(msg->lib) {
         case INIT:
-            returnNum = initImage(name);
-            msg->returnNum = returnNum;
+            msg->returnNum = initImage(name);
             break;
         case LOOKUP:
-            returnNum = sLookup(msg->pinum, msg->name);
-            msg->returnNum = returnNum;
+            msg->returnNum = sLookup(msg->pinum, msg->name);
             break;
         case STAT:
-            returnNum = sStat(msg->inum, &(msg->stat));
-            msg->returnNum = returnNum;
+            msg->returnNum = sStat(msg->inum, &(msg->stat));
             break;
         case WRITE:
-            returnNum = sWrite(msg->inum, msg->buffer, msg->block);
-            msg->returnNum = returnNum;
+            msg->returnNum = sWrite(msg->inum, msg->buffer, msg->block);
             break;
         case READ:
-            returnNum = sRead(msg->inum, msg->buffer, msg->block);
-            msg->returnNum = returnNum;
+            msg->returnNum = sRead(msg->inum, msg->buffer, msg->block);
             break;
         case CREAT:
-            returnNum = sCreate(msg->pinum, msg->type, msg->name);
-            msg->returnNum = returnNum;
+            msg->returnNum = sCreate(msg->pinum, msg->type, msg->name);
             break;
         case UNLINK:
-            returnNum = sUnlink(msg->pinum, msg->name);
-            msg->returnNum = returnNum;
+            msg->returnNum = sUnlink(msg->pinum, msg->name);
             break;
         case SHUTDOWN:
             msg->returnNum = 0;
@@ -692,10 +652,6 @@ void handle(char * msgBuff) {
             fsync(fdDisk);
             close(fdDisk);
             exit(0);
-            break;
-        default:
-            msg->returnNum = -1;
-            break;
     }
     memcpy(msgBuff, msg, sizeof(*msg));
 }
