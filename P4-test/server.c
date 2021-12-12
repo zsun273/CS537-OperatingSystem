@@ -380,7 +380,7 @@ int sCreate(int pinum, int type, char *name) {
         write(fdDisk, &chkpt, sizeof(checkpoint_t));
     }
     
-    lseek(fdDisk, pinumLoc, 0);
+    lseek(fdDisk, iArr.inodeArr[pinum], 0);
     write(fdDisk, &pInode, sizeof(pInode));
     loadMem();
     lseek(fdDisk, pInode.blockArr[iDirBlkInd], 0);
