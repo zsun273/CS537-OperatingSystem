@@ -13,7 +13,7 @@ typedef struct __MFS_Stat_t {
 } MFS_Stat_t;
 
 typedef struct __MFS_DirEnt_t {
-    char name[60];  // up to 28 bytes of name in directory (including \0)
+    char name[28];  // up to 28 bytes of name in directory (including \0)
     int  inum;      // inode number of entry (-1 means entry not used)
 } MFS_DirEnt_t;
 
@@ -64,7 +64,7 @@ typedef enum type_t {
 
 //send this struct over the server
 typedef struct msg_t {
-    char name[60]; //name of the directory
+    char name[28]; //name of the directory
     char buffer[4096]; //buffer
     int inum;
     int block;

@@ -61,13 +61,10 @@ int initImage(char *imgName) {
     //doesn't exit
     if(fdDisk < 0) {
         fdDisk = open(imgName, O_RDWR | O_CREAT | O_TRUNC, S_IRWXU);
-
-
         //add all sizes that are needed the first time initializing
         chkpt.endLog = sizeof(checkpoint_t) + sizeof(imap_t) + sizeof(inode_t) + sizeof(dir_t);
 
         int i;
-
         //make all peices in checkpoint invalid
         for(i = 0; i < 256; i++) {
             chkpt.imap[i] = -1;
@@ -146,7 +143,6 @@ int initImage(char *imgName) {
             j++;
             k++;
         }
-        ;
     }
 
 
@@ -424,18 +420,18 @@ int sCreate(int pinum, int type, char *name) {
         return -1;
     }
     
-    if(pInode.stat.size >= (4096 * 14 * 64)) {
+    if(pInode.stat.size >= (4096 * 14 * 32)) {
         return -1;
     }
     
     int newInum = cInode(pinum, type);
-    int iDirBlkInd = pInode.stat.size / (4096 * 64);
+    int iDirBlkInd = pInode.stat.size / (4096 * 128);
     
     if(iDirBlkInd > 14) {
         return -1;
     }
 
-    int dirBlkInd = (pInode.stat.size/(4096) % 64);
+    int dirBlkInd = (pInode.stat.size/(4096) % 128);
     
     
     pInode.stat.size += 4096;
@@ -592,8 +588,8 @@ int cInode(int pinum, int type) {
     
     if(type == 0) {
         dir_t dirBlk;
-        //int k = sizeof(dirBlk)/sizeof(dirBlk.dirArr[0]);
-        for(i = 0; i < 128; i++) {
+        int k = sizeof(dirBlk)/sizeof(dirBlk.dirArr[0]);
+        for(i = 0; i < k; i++) {
             dirBlk.dirArr[i].inum = -1;
             sprintf(dirBlk.dirArr[i].name, "\0");
         }
