@@ -201,32 +201,17 @@ int sWrite(int inum, char *buff, int blk) {
 int sUnlink(int pinum, char *name) {
     loadMem();
     
-    if(pinum < 0 || pinum > 4096) {
-        return -1;
-    }
-    
-    if(iArr.inodeArr[pinum] == -1) {
-        return -1;
-    }
-    
+    if(pinum < 0 || pinum > 4096) return -1;
+    if(iArr.inodeArr[pinum] == -1) return -1;
     //test to see if name is equivalent to parent or current directory
-    if(strcmp(name, "..\0") == 0 || strcmp(name, ".\0") == 0) {
-        return -1;
-    }
-    
-    if(strlen(name) > 28 || strlen(name) < 0) {
-        return -1;
-    }
+    if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0) return -1;
+    if(strlen(name) > 28 || strlen(name) < 0) return -1;
     
     int pinumLoc = iArr.inodeArr[pinum];
-    
     inode_t pInode;
-    lseek(fdDisk, pinumLoc, 0);
+    lseek(fdDisk, pinumLoc, SEEK_SET);
     read(fdDisk, &pInode, sizeof(inode_t));
-
-    if(pInode.stat.type != 0) {
-        return -1;
-    }
+    if(pInode.stat.type != MFS_DIRECTORY) return -1;
     
     int found = -1;
     int delDirBlkLoc;
@@ -253,15 +238,15 @@ int sUnlink(int pinum, char *name) {
     }
     
     if(found < 0) {
-        return -1;
+        return 0; // name not existing is not a failure
     }
     
     inode_t inodeDel;
-    lseek(fdDisk, delInodeLoc, 0);
+    lseek(fdDisk, delInodeLoc, SEEK_SET);
     read(fdDisk, &inodeDel, sizeof(inodeDel));
     
-    if(inodeDel.stat.type == 0) {
-        if(inodeDel.stat.size > 2 * 4096) {
+    if(inodeDel.stat.type == MFS_DIRECTORY) {
+        if(inodeDel.stat.size > 2 * 4096) { // this is not an empty directory
             return -1;
         }
     }
@@ -269,7 +254,7 @@ int sUnlink(int pinum, char *name) {
     delInode(delInodeLoc);
     
     dirBlk.dirArr[delInd].inum = -1;
-    sprintf(dirBlk.dirArr[delInd].name, "\0");
+    sprintf(dirBlk.dirArr[delInd].name, "x");
     lseek(fdDisk, delDirBlkLoc, 0);
     write(fdDisk, &dirBlk, sizeof(dir_t));
     
@@ -352,15 +337,12 @@ int sCreate(int pinum, int type, char *name) {
     }
     
     int newInum = cInode(pinum, type);
-    int iDirBlkInd = pInode.stat.size / (4096 * 128);
+    int iDirBlkInd = pInode.stat.size / (BUFFER_SIZE * 128);
     
-    if(iDirBlkInd > 14) {
-        return -1;
-    }
+    if(iDirBlkInd > 14) return -1;
 
-    int dirBlkInd = (pInode.stat.size/(4096) % 128);
-    
-    
+    int dirBlkInd = (pInode.stat.size/(BUFFER_SIZE) % 128);
+
     pInode.stat.size += 4096;
     
     if(dirBlkInd == 0) {
@@ -368,7 +350,7 @@ int sCreate(int pinum, int type, char *name) {
         dir_t newDirBlk;
         int i;
         for(i = 0; i < 128; i++) {
-            sprintf(newDirBlk.dirArr[i].name, "\0");
+            sprintf(newDirBlk.dirArr[i].name, "x");
             newDirBlk.dirArr[i].inum = -1;
         }
         
@@ -388,7 +370,7 @@ int sCreate(int pinum, int type, char *name) {
     read(fdDisk, &dirBlk, sizeof(dir_t));
     
     int nInd = dirBlkInd;
-    sprintf(dirBlk.dirArr[nInd].name, "\0");
+    sprintf(dirBlk.dirArr[nInd].name, "x");
     sprintf(dirBlk.dirArr[nInd].name, name, 28);
     dirBlk.dirArr[nInd].inum = newInum;
     
@@ -444,7 +426,7 @@ int delInode(int inum) {
         i++;
     }
     
-    if(i == 0) {
+    if(i == 0) { // this imap is empty, all -1
         int test = delImap(imapInd);
     }
     else {
@@ -469,8 +451,9 @@ int delImap(int imapInd) {
 
 int cInode(int pinum, int type) {
     loadMem();
-    int nInodeNum;
 
+    // find first empty inode
+    int nInodeNum;
     int i;
     for(i = 0; i < 4096; i++) {
         if(iArr.inodeArr[i] == -1) {
