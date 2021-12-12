@@ -37,7 +37,7 @@ typedef struct imap_t {
 
 //contain directories
 typedef struct dir_t {
-    MFS_DirEnt_t dirArr[64];
+    MFS_DirEnt_t dirArr[128];
 } dir_t;
 
 //this will contain all inodes
