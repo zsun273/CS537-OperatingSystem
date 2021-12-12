@@ -66,8 +66,10 @@ int initImage(char *imgName) {
         //add all sizes that are needed the first time initializing
         chkpt.endLog = sizeof(checkpoint_t) + sizeof(imap_t) + sizeof(inode_t) + sizeof(dir_t);
 
+        int i;
+
         //make all peices in checkpoint invalid
-        for(int i = 0; i < 256; i++) {
+        for(i = 0; i < 256; i++) {
             chkpt.imap[i] = -1;
         }
 
@@ -80,7 +82,7 @@ int initImage(char *imgName) {
         //create the root
         imap_t imap;
         //clear out inode arrays
-        for(int i = 0; i < 16; i++) {
+        for(i = 0; i < 16; i++) {
             imap.inodeArr[i] = -1;
         }
 
@@ -94,7 +96,7 @@ int initImage(char *imgName) {
         //make it a directory
         root.stat.type = 0;
         //initialize all to -1
-        for(int i = 0; i < 14; i++) {
+        for(i = 0; i < 14; i++) {
             root.blockArr[i] = -1;
         }
 
@@ -106,7 +108,7 @@ int initImage(char *imgName) {
         //write first directory block
         dir_t rootDir;
         int sent = sizeof(dir_t)/sizeof(rootDir.dirArr[0]);
-        for(int i = 0; i < sent; i++) {
+        for(i = 0; i < sent; i++) {
             rootDir.dirArr[i].inum = -1;
             sprintf(rootDir.dirArr[i].name, "\0");
         }
@@ -127,13 +129,14 @@ int initImage(char *imgName) {
         read(fdDisk, &chkpt, sizeof(checkpoint_t));
     }
 
-    for(int i = 0; i < 4096; i++) {
+    int i;
+    for(i = 0; i < 4096; i++) {
         iArr.inodeArr[i] = -1;
     }
 
-    int i;
-    int j;
-    int k;
+    //now read imap
+    int j = 0;
+    int k = 0;
     imap_t imapTemp;
     while(chkpt.imap[i] >= 0) {
         lseek(fdDisk, chkpt.imap[i], 0);
@@ -143,8 +146,11 @@ int initImage(char *imgName) {
             j++;
             k++;
         }
+        ;
     }
 
+
+    //load mem
     loadMem();
 
     return 0;
