@@ -454,7 +454,6 @@ int delImap(int imapInd) {
 
 int cInode(int pinum, int type) {
     loadMem();
-
     // find first empty inode
     int nInodeNum = -1;
     for(int i = 0; i < 4096; i++) {
@@ -480,7 +479,7 @@ int cInode(int pinum, int type) {
 
         chkpt.imap[emptyMapNum] = chkpt.endLog;
         imap_t nimap;
-        for(i = 0; i < 16; i++) {
+        for(int i = 0; i < 16; i++) {
             nimap.inodeArr[i] = -1;
         }
 
