@@ -13,6 +13,7 @@ int server_Stat(int inum, MFS_Stat_t *m);
 int server_Write(int inum, char *buffer, int block);
 int server_Read(int inum, char *buffer, int block);
 int server_Creat(int pinum, int type, char *name);
+int create_inode(int pinum, int type);
 int server_Unlink(int pinum, char *name);
 int server_Shutdown();
 
@@ -283,8 +284,157 @@ int server_Read(int inum, char *buffer, int block){
     return 0;
 }
 
-int server_Creat(int pinum, int type, char *name){
+int server_Creat(int pinum, int type, char *name){  
+    if (pinum < 0 || pinum >= 4096) return -1;    
+    if (type != 0 && type != 1) return -1;
+    if (strlen(name) < 1 || strlen(name) >= 60) return -1;
+    if (server_Lookup(pinum,name) >= 0) return 0;
+    
+    int pLocation = all_inodes.inodeArr[pinum];
+    MFS_inode_t parentInode;
+    lseek(fd,index,0);
+    read(fd, &parentInode, sizeof(MFS_inode_t));
+
+    if (parentInode.type != 0) return -1; //abort on parent is file
+    if (parentInode.size >= 3670016) return -1; 
+
+    int newInodeNum = create_Inode(pinum, type);
+    int newBlkIndex = parentInode.size / 4096 / 64;
+    if (newBlkIndex > 14) return -1;
+
+    int dirBlkIndex = parentInode.size / 4096 % 64;
+
+    parentInode.size += 4096;
+
+    //if full, add new block
+    if (dirBlkIndex == 0) {
+        parentInode.blockArr[newBlkIndex] = CR.endOfLog;
+        MFS_dir_t newDirBlk;
+        for(int i = 0; i < 32; i++) {
+            sprintf(newDirBlk.dirArr[i].name, "\0");
+            newDirBlk.dirArr[i].inum = -1;
+        }
+        
+        lseek(fd, CR.endOfLog, 0);
+        write(fd, &newDirBlk, sizeof(MFS_dir_t));
+        
+        CR.endOfLog += 4096;
+        lseek(fd, 0, 0);
+        write(fd, &CR, sizeof(MFS_checkpoint_t));
+    }
+    
+    lseek(fd, pLocation, 0);
+    write(fd, &parentInode, sizeof(parentInode));
+
+    load_mem();
+    lseek(fd, parentInode.blockArr[newBlkIndex],0);
+    MFS_dir_t dirBlk;
+    read(fd, &dirBlk, sizeof(MFS_dir_t));
+
+    int nInd = dirBlkIndex;
+    sprintf(dirBlk.dirArr[nInd].name,"\0");
+    sprintf(dirBlk.dirArr[nInd].name,name,60);
+    dirBlk.dirArr[nInd].inum = newInodeNum;
+
+    lseek(fd, parentInode.blockArr[newBlkIndex],0);
+    write(fd,&dirBlk,sizeof(MFS_dir_t));
+    load_mem();
     return 0;
+}
+
+int create_Inode(int pinum, int type){
+    load_mem();
+    
+    int emptyInodeNum = -1;
+    for (int i=0; i<4096; i++) {
+        if (all_inodes.inodeArr[i] == -1) {
+            emptyInodeNum = i;
+            break;
+        }
+    }
+    if (emptyInodeNum==-1) return -1;
+
+    int imapIndex = emptyInodeNum / 16;
+    int inodeIndex = emptyInodeNum % 16;
+
+    //new map
+    if (inodeIndex == 0) {
+        load_mem();
+        int emptyMapNum = -1;
+        for (int i=0;i < 256;i++) {
+            if (CR.imap[i] == -1) {
+                emptyMapNum = i;
+                break;
+            }
+        }
+
+        if (emptyMapNum == -1) return -1;
+
+        CR.imap[emptyMapNum] = CR.endOfLog;
+        //new map
+        MFS_imap_t newMap;
+        for(int i=0; i < 16; i++) {
+            newMap.inodeArr[i] = -1;
+        }
+
+        CR.endOfLog += sizeof(MFS_imap_t);
+        lseek(fd,0,0);
+        write(fd,&CR,sizeof(MFS_checkpoint_t));
+        lseek(fd,CR.imap[emptyMapNum],0);
+        write(fd,&newMap,sizeof(MFS_imap_t));
+        load_mem();
+    }
+
+    //read old map, populate, write back
+    MFS_imap_t tempMap;
+    lseek(fd, CR.imap[imapIndex], 0);
+    read(fd, &tempMap, sizeof(MFS_imap_t));
+    tempMap.inodeArr[inodeIndex] = CR.endOfLog;
+    lseek(fd, CR.imap[imapIndex], 0);
+    write(fd, &tempMap, sizeof(MFS_imap_t));
+
+    MFS_inode_t newInode;
+    newInode.type = type;
+    for (int i=0;i < 14; i++) {
+        newInode.blockArr[i] = -1;
+    }
+
+    newInode.blockArr[0] = CR.endOfLog + sizeof(MFS_inode_t);
+    if (type == 0) {
+        newInode.size = 8192;
+    } else {
+        newInode.size = 0;
+    }
+
+    lseek(fd, CR.endOfLog, 0);
+    write(fd, &newInode, sizeof(MFS_inode_t));
+    CR.endOfLog += sizeof(newInode);
+
+    if (type == 0) {
+        MFS_dir_t dirBlk;
+        int k = sizeof(dirBlk)/sizeof(dirBlk.dirArr[0]);
+        for (int i=0; i< k; i++) {
+            dirBlk.dirArr[i].inum = -1;
+            sprintf(dirBlk.dirArr[i].name,"\0");
+        }
+        sprintf(dirBlk.dirArr[0].name,".\0");
+        dirBlk.dirArr[0].inum = emptyInodeNum;
+        sprintf(dirBlk.dirArr[1].name,"..\0");
+        dirBlk.dirArr[1].inum = pinum;
+        write(fd, &dirBlk, sizeof(MFS_dir_t));
+        CR.endOfLog += sizeof(MFS_dir_t);
+    } else {
+        char *dataBlk = malloc(4096);
+        write(fd, dataBlk, 4096);
+        free(dataBlk);
+        CR.endOfLog += 4096;
+    }
+
+    lseek(fd, 0, 0);
+    write(fd, &CR, sizeof(MFS_checkpoint_t));
+    load_mem();
+
+    return emptyInodeNum;
 }
 
 int server_Unlink(int pinum, char *name){
