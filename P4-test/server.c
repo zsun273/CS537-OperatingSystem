@@ -62,7 +62,7 @@ int initImage(char *imgName) {
         fdDisk = open(imgName, O_RDWR | O_CREAT | O_TRUNC, S_IRWXU);
 
         // initialize the checkpoint region
-        for(i = 0; i < 256; i++) {
+        for(int i = 0; i < 256; i++) {
             chkpt.imap[i] = -1;
         }
         chkpt.imap[0] = sizeof(checkpoint_t); // imap starts right after checkpoint region
