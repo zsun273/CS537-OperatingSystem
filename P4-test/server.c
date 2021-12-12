@@ -200,6 +200,9 @@ int sWrite(int inum, char *buff, int blk) {
 }
 
 int sUnlink(int pinum, char *name) {
+    unlink_times ++;
+    printf("unlink times: %d\n", unlink_times);
+
     loadMem();
     
     if(pinum < 0 || pinum > 4096) return -1;
@@ -270,10 +273,9 @@ int sUnlink(int pinum, char *name) {
     pInode.stat.size = (sizeInd + 1) * 4096;
     lseek(fdDisk, pinumLoc, 0);
     write(fdDisk, &pInode, sizeof(inode_t));
+
     loadMem();
 
-    unlink_times ++;
-    printf("unlink times: %d\n", unlink_times);
     return 0;
 }
 
