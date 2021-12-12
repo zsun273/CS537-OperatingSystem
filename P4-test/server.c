@@ -326,6 +326,8 @@ int sLookup(int pinum, char *name) {
 }
 
 int sCreate(int pinum, int type, char *name) {
+    printf("create starts\n");
+
     if(pinum < 0 || pinum > 4096) return -1;
     if(type != MFS_DIRECTORY && type != MFS_REGULAR_FILE) return -1;
     if(strlen(name) < 1 || strlen(name) >= 28) return -1;
