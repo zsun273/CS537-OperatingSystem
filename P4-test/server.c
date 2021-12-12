@@ -56,97 +56,57 @@ int main(int argc, char *argv[]) {
 }
 
 int initImage(char *imgName) {
-    fdDisk = open(imgName, O_RDWR);
+    fdDisk = open(imgName, O_RDWR); // open an existing file with r/w access
 
-    //doesn't exit
-    if(fdDisk < 0) {
+    if(fdDisk < 0) {                // file not exist, create and initialize
         fdDisk = open(imgName, O_RDWR | O_CREAT | O_TRUNC, S_IRWXU);
-        //add all sizes that are needed the first time initializing
-        chkpt.endLog = sizeof(checkpoint_t) + sizeof(imap_t) + sizeof(inode_t) + sizeof(dir_t);
 
-        int i;
-        //make all peices in checkpoint invalid
+        // initialize the checkpoint region
         for(i = 0; i < 256; i++) {
             chkpt.imap[i] = -1;
         }
+        chkpt.imap[0] = sizeof(checkpoint_t); // imap starts right after checkpoint region
+        chkpt.endLog = sizeof(checkpoint_t) + sizeof(imap_t) + sizeof(inode_t) + sizeof(dir_t);
 
-        //the first imap is at right after the checkpoint so add checkpoint size
-        chkpt.imap[0] = sizeof(checkpoint_t);
-
-        lseek(fdDisk, 0, 0);
-        write(fdDisk, &chkpt, sizeof(checkpoint_t));
-
-        //create the root
+        //initialize the inode map
         imap_t imap;
-        //clear out inode arrays
-        for(i = 0; i < 16; i++) {
+        for(int i = 0; i < 16; i++) {
             imap.inodeArr[i] = -1;
         }
+        imap.inodeArr[0] = sizeof(checkpoint_t)+sizeof(imap_t); // first inode starts right after the imap
 
-        //point the first to right after the imap
-        imap.inodeArr[0] = sizeof(checkpoint_t)+sizeof(imap_t);
-
-        write(fdDisk, &imap, sizeof(imap));
-
-        //now write roote inode
+        //initialize inode for root directory
         inode_t root;
-        //make it a directory
-        root.stat.type = 0;
-        //initialize all to -1
-        for(i = 0; i < 14; i++) {
+        root.stat.type = MFS_DIRECTORY;
+        root.stat.size = 2 * 4096;
+        for(int i = 0; i < 14; i++) {
             root.blockArr[i] = -1;
         }
-
-        //point data block to right after inode
         root.blockArr[0] = sizeof(checkpoint_t) + sizeof(imap_t) + sizeof(inode_t);
-        root.stat.size = 2 * 4096;
-        write(fdDisk, &root, sizeof(inode_t));
 
         //write first directory block
         dir_t rootDir;
-        int sent = sizeof(dir_t)/sizeof(rootDir.dirArr[0]);
-        for(i = 0; i < sent; i++) {
+        for(int i = 0; i < 128; i++) { // TODO: upper bound need to change here
             rootDir.dirArr[i].inum = -1;
-            sprintf(rootDir.dirArr[i].name, "\0");
+            sprintf(rootDir.dirArr[i].name, "x");
         }
 
-        //add . and ..
-        sprintf(rootDir.dirArr[0].name, ".\0");
-        //make it valid
+        // initialize two directory entries
         rootDir.dirArr[0].inum = 0;
-
-        sprintf(rootDir.dirArr[1].name, "..\0");
-        //make it valid
+        sprintf(rootDir.dirArr[0].name, ".");
         rootDir.dirArr[1].inum = 0;
-        //write dir block
+        sprintf(rootDir.dirArr[1].name, "..");
+
+        lseek(fdDisk, 0, SEEK_SET);
+        write(fdDisk, &chkpt, sizeof(checkpoint_t));
+        write(fdDisk, &imap, sizeof(imap));
+        write(fdDisk, &root, sizeof(inode_t));
         write(fdDisk, &rootDir, sizeof(dir_t));
     }
-    else {
-        //read the disk image's checkpoint region
+    else { //file exist, read in existing checkpoint region
         read(fdDisk, &chkpt, sizeof(checkpoint_t));
     }
 
-    int i;
-    for(i = 0; i < 4096; i++) {
-        iArr.inodeArr[i] = -1;
-    }
-
-    //now read imap
-    int j = 0;
-    int k = 0;
-    imap_t imapTemp;
-    while(chkpt.imap[i] >= 0) {
-        lseek(fdDisk, chkpt.imap[i], 0);
-        read(fdDisk, &imapTemp, sizeof(imap_t));
-        while(imapTemp.inodeArr[k] >= 0) {
-            iArr.inodeArr[j] = imapTemp.inodeArr[k];
-            j++;
-            k++;
-        }
-    }
-
-
-    //load mem
     loadMem();
 
     return 0;
