@@ -13,7 +13,7 @@ int server_Stat(int inum, MFS_Stat_t *m);
 int server_Write(int inum, char *buffer, int block);
 int server_Read(int inum, char *buffer, int block);
 int server_Creat(int pinum, int type, char *name);
-int create_inode(int pinum, int type);
+int create_Inode(int pinum, int type);
 int server_Unlink(int pinum, char *name);
 int server_Shutdown();
 
@@ -287,7 +287,7 @@ int server_Read(int inum, char *buffer, int block){
 int server_Creat(int pinum, int type, char *name){  
     if (pinum < 0 || pinum >= 4096) return -1;    
     if (type != 0 && type != 1) return -1;
-    if (strlen(name) < 1 || strlen(name) >= 60) return -1;
+    if (strlen(name) < 1 || strlen(name) >= 28) return -1;
     if (server_Lookup(pinum,name) >= 0) return 0;
     
     int pLocation = all_inodes.inodeArr[pinum];
@@ -299,10 +299,10 @@ int server_Creat(int pinum, int type, char *name){
     if (parentInode.size >= 3670016) return -1; 
 
     int newInodeNum = create_Inode(pinum, type);
-    int newBlkIndex = parentInode.size / 4096 / 64;
+    int newBlkIndex = parentInode.size / 4096 / 128;
     if (newBlkIndex > 14) return -1;
 
-    int dirBlkIndex = parentInode.size / 4096 % 64;
+    int dirBlkIndex = parentInode.size / 4096 % 128;
 
     parentInode.size += 4096;
 
@@ -310,7 +310,7 @@ int server_Creat(int pinum, int type, char *name){
     if (dirBlkIndex == 0) {
         parentInode.blockArr[newBlkIndex] = CR.endOfLog;
         MFS_dir_t newDirBlk;
-        for(int i = 0; i < 32; i++) {
+        for(int i = 0; i < 128; i++) {
             sprintf(newDirBlk.dirArr[i].name, "\0");
             newDirBlk.dirArr[i].inum = -1;
         }
@@ -333,7 +333,7 @@ int server_Creat(int pinum, int type, char *name){
 
     int nInd = dirBlkIndex;
     sprintf(dirBlk.dirArr[nInd].name,"\0");
-    sprintf(dirBlk.dirArr[nInd].name,name,60);
+    sprintf(dirBlk.dirArr[nInd].name,name,28);
     dirBlk.dirArr[nInd].inum = newInodeNum;
 
     lseek(fd, parentInode.blockArr[newBlkIndex],0);

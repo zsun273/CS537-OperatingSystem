@@ -87,7 +87,7 @@ int initImage(char *imgName) {
 
         //write first directory block
         dir_t rootDir;
-        for(int i = 0; i < 128; i++) { // TODO: upper bound need to change here
+        for(int i = 0; i < 128; i++) {
             rootDir.dirArr[i].inum = -1;
             sprintf(rootDir.dirArr[i].name, "x");
         }
@@ -326,8 +326,6 @@ int sLookup(int pinum, char *name) {
 }
 
 int sCreate(int pinum, int type, char *name) {
-    printf("create starts\n");
-
     if(pinum < 0 || pinum > 4096) return -1;
     if(type != MFS_DIRECTORY && type != MFS_REGULAR_FILE) return -1;
     if(strlen(name) < 1 || strlen(name) >= 28) return -1;
@@ -335,45 +333,42 @@ int sCreate(int pinum, int type, char *name) {
     if(sLookup(pinum, name) >= 0) return 0; // name exist, return success
     
     //get pinum location
-    lseek(fdDisk, iArr.inodeArr[pinum], SEEK_SET);
     inode_t pInode;
+    lseek(fdDisk, iArr.inodeArr[pinum], SEEK_SET);
     read(fdDisk, &pInode, sizeof(inode_t));
+
     if(pInode.stat.type != MFS_DIRECTORY) return -1;
-    
-    if(pInode.stat.size >= (4096 * 14 * 128)) { // one data block for inode for dir can point to 128 dir entries
-        return -1;
-    }
+    if(pInode.stat.size >= (BUFFER_SIZE * 14 * 128)) return -1;
     
     int newInum = cInode(pinum, type);
     int iDirBlkInd = pInode.stat.size / (BUFFER_SIZE * 128);
-    
     if(iDirBlkInd > 14) return -1;
 
     int dirBlkInd = (pInode.stat.size/(BUFFER_SIZE) % 128);
 
-    pInode.stat.size += 4096;
-    
+    pInode.stat.size += BUFFER_SIZE;
+
+    // if full, add new block for directory
     if(dirBlkInd == 0) {
         pInode.blockArr[iDirBlkInd] = chkpt.endLog;
         dir_t newDirBlk;
-        int i;
-        for(i = 0; i < 128; i++) {
+        for(int i = 0; i < 128; i++) {
             sprintf(newDirBlk.dirArr[i].name, "x");
             newDirBlk.dirArr[i].inum = -1;
         }
         
         lseek(fdDisk, chkpt.endLog, 0);
         write(fdDisk, &newDirBlk, sizeof(dir_t));
-        
-        chkpt.endLog += 4096;
-        lseek(fdDisk, 0, 0);
+        // update checkpoint region
+        chkpt.endLog += BUFFER_SIZE;
+        lseek(fdDisk, 0, SEEK_SET);
         write(fdDisk, &chkpt, sizeof(checkpoint_t));
     }
     
-    lseek(fdDisk, iArr.inodeArr[pinum], 0);
+    lseek(fdDisk, iArr.inodeArr[pinum], SEEK_SET);
     write(fdDisk, &pInode, sizeof(pInode));
-    loadMem();
-    lseek(fdDisk, pInode.blockArr[iDirBlkInd], 0);
+    //loadMem();
+    lseek(fdDisk, pInode.blockArr[iDirBlkInd], SEEK_SET);
     dir_t dirBlk;
     read(fdDisk, &dirBlk, sizeof(dir_t));
     
@@ -461,21 +456,42 @@ int cInode(int pinum, int type) {
     loadMem();
 
     // find first empty inode
-    int nInodeNum;
-    int i;
-    for(i = 0; i < 4096; i++) {
+    int nInodeNum = -1;
+    for(int i = 0; i < 4096; i++) {
         if(iArr.inodeArr[i] == -1) {
             nInodeNum = i;
             break;
         }
     }
-    
+    if (nInodeNum == -1) return -1;
+
     int imapInd = nInodeNum / 16;
     int nImapInd = nInodeNum % 16;
-    
-    int imapPart;
-    if(nImapInd == 0) {
-        imapPart = cImapPiece();
+
+    if(nImapInd == 0) { // need to create a new imap
+        int emptyMapNum = -1;
+        for(int i = 0; i < 256; i++) {
+            if(chkpt.imap[i] == -1) {
+                emptyMapNum = i;
+                break;
+            }
+        }
+        if (emptyMapNum == -1) return -1;
+
+        chkpt.imap[emptyMapNum] = chkpt.endLog;
+        imap_t nimap;
+        for(i = 0; i < 16; i++) {
+            nimap.inodeArr[i] = -1;
+        }
+
+        chkpt.endLog += sizeof(imap_t);
+        lseek(fdDisk, 0, SEEK_SET);
+        write(fdDisk, &chkpt, sizeof(checkpoint_t));
+        lseek(fdDisk, chkpt.imap[emptyMapNum], SEEK_SET);
+        write(fdDisk, &nimap, sizeof(imap_t));
+        loadMem();
+        //cImapPiece();
+
     }
     
     imap_t imapTmp;
@@ -488,7 +504,7 @@ int cInode(int pinum, int type) {
     
     inode_t nInode;
     nInode.stat.type = type;
-    for(i = 0; i < 14; i++) {
+    for(int i = 0; i < 14; i++) {
         nInode.blockArr[i] = -1;
     }
     
@@ -507,15 +523,15 @@ int cInode(int pinum, int type) {
     if(type == 0) {
         dir_t dirBlk;
         int k = sizeof(dirBlk)/sizeof(dirBlk.dirArr[0]);
-        for(i = 0; i < k; i++) {
+        for(int i = 0; i < k; i++) {
             dirBlk.dirArr[i].inum = -1;
-            sprintf(dirBlk.dirArr[i].name, "\0");
+            sprintf(dirBlk.dirArr[i].name, "x");
         }
         
-        sprintf(dirBlk.dirArr[0].name, ".\0");
+        sprintf(dirBlk.dirArr[0].name, ".");
         dirBlk.dirArr[0].inum = nInodeNum;
         
-        sprintf(dirBlk.dirArr[1].name, "..\0");
+        sprintf(dirBlk.dirArr[1].name, "..");
         dirBlk.dirArr[1].inum = pinum;
         
         write(fdDisk, &dirBlk, sizeof(dir_t));
@@ -528,7 +544,7 @@ int cInode(int pinum, int type) {
         chkpt.endLog += 4096;
     }
     
-    lseek(fdDisk, 0, 0);
+    lseek(fdDisk, 0, SEEK_SET);
     write(fdDisk, &chkpt, sizeof(checkpoint_t));
     loadMem();
     return nInodeNum;
