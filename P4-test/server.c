@@ -188,7 +188,7 @@ int sWrite(int inum, char *buff, int blk) {
         write(fdDisk, buff, BUFFER_SIZE);
     }
     else {
-        inode.stat.size = (blk + 1) * 4096
+        inode.stat.size = (blk + 1) * 4096;
         lseek(fdDisk, iArr.inodeArr[inum], SEEK_SET);
         write(fdDisk, &inode, sizeof(inode_t));
         lseek(fdDisk, inode.blockArr[blk], SEEK_SET);
