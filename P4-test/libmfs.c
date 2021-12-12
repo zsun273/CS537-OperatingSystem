@@ -118,11 +118,6 @@ int MFS_Write(int inum, char *buffer, int block) {
     msg.inum = inum;
     msg.block = block;
     memcpy(msg.buffer, buffer, 4096);
-    //int i;
-   // for(i = 0; i < 4096; i++)
-    //{
-    //    printf("%c ", msg.buffer[i]);
-    //}
     int rc;
     
     valReturn = 0;
@@ -252,7 +247,6 @@ int MFS_Unlink(int pinum, char *name) {
     }
     
     return msg.returnNum;
-    
 }
 
 int MFS_Shutdown() {
@@ -269,5 +263,3 @@ int MFS_Shutdown() {
     
     return 0;
 }
-
-

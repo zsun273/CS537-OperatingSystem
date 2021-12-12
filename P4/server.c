@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
 }
     
 int init_image(char* name){
-    int fd = open(name, O_RDWR); // open an existing file with r/w access
+    fd = open(name, O_RDWR); // open an existing file with r/w access
 
     if (fd < 0){                 // file not exist, create and initialize
         fd = open(name, O_RDWR | O_CREAT | O_TRUNC, S_IRWXU);
