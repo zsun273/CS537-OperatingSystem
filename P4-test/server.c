@@ -204,72 +204,63 @@ int sUnlink(int pinum, char *name) {
     //test to see if name is equivalent to parent or current directory
     if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0) return -1;
     if(strlen(name) > 28 || strlen(name) < 0) return -1;
-    
-    int pinumLoc = iArr.inodeArr[pinum];
+
     inode_t pInode;
-    lseek(fdDisk, pinumLoc, SEEK_SET);
+    lseek(fdDisk, iArr.inodeArr[pinum], SEEK_SET);
     read(fdDisk, &pInode, sizeof(inode_t));
     if(pInode.stat.type != MFS_DIRECTORY) return -1;
     
-    int found = -1;
+    int found = 0;
     int delDirBlkLoc;
     int delInd;
     int delInodeLoc;
     dir_t dirBlk;
-    int i;
-    int j;
-    for(i = 0; i < 14; i++) {
+    for(int i = 0; i < 14; i++) {
         if(pInode.blockArr[i] >= 0) {
-            lseek(fdDisk, pInode.blockArr[i], 0);
+            lseek(fdDisk, pInode.blockArr[i], SEEK_SET);
             read(fdDisk, &dirBlk, sizeof(dir_t));
-            for(j = 0; j < 128; j++) {
+            for(int j = 0; j < 128; j++) {
                 if(strcmp(dirBlk.dirArr[j].name, name) == 0) {
                     found = 1;
-                    delInodeLoc = iArr.inodeArr[dirBlk.dirArr[j].inum];
                     delInd = j;
+                    delInodeLoc = iArr.inodeArr[dirBlk.dirArr[j].inum];
                     delDirBlkLoc = pInode.blockArr[i];
-                    i = 15;
                     break;
                 }
             }
+            if (found == 1) break;
         }
     }
     
-    if(found < 0) {
-        return 0; // name not existing is not a failure
-    }
+    if(found == 0) return 0; // name not existing is not a failure
     
     inode_t inodeDel;
     lseek(fdDisk, delInodeLoc, SEEK_SET);
     read(fdDisk, &inodeDel, sizeof(inodeDel));
     
-    if(inodeDel.stat.type == MFS_DIRECTORY) {
-        if(inodeDel.stat.size > 2 * 4096) { // this is not an empty directory
-            return -1;
-        }
+    if(inodeDel.stat.type == MFS_DIRECTORY && inodeDel.stat.size > 2 * BUFFER_SIZE) {
+        return -1; // this is not an empty directory
     }
 
     delInode(delInodeLoc);
     
     dirBlk.dirArr[delInd].inum = -1;
     sprintf(dirBlk.dirArr[delInd].name, "x");
-    lseek(fdDisk, delDirBlkLoc, 0);
+    lseek(fdDisk, delDirBlkLoc, SEEK_SET);
     write(fdDisk, &dirBlk, sizeof(dir_t));
     
-    int sizeInd = 0;
-    for(i = 0; i < 14; i++) {
+    int sizeInd = -1;
+    for(int i = 0; i < 14; i++) {
         if(pInode.blockArr[i] != -1) {
             sizeInd = i;
         }
     }
-    
-    //increase size that can be put into directory
-    pInode.stat.size = (sizeInd + 1) * 4096;
-    lseek(fdDisk, pinumLoc, 0);
+    //update parent directory's size
+    pInode.stat.size = (sizeInd + 1) * BUFFER_SIZE;
+    lseek(fdDisk, iArr.inodeArr[pinum], SEEK_SET);
     write(fdDisk, &pInode, sizeof(inode_t));
 
     loadMem();
-
     return 0;
 }
 
