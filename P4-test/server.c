@@ -159,58 +159,40 @@ int sRead(int inum, char *buff, int blk) {
 }
 
 int sWrite(int inum, char *buff, int blk) {
-    if(inum >= 4096 || inum < 0) {
-        return -1;
-    }
-    
-    if(blk > 13 || blk < 0) {
-        return -1;
-    }
+    if(inum >= 4096 || inum < 0) return -1;
+    if(blk > 13 || blk < 0) return -1;
     
     loadMem();
     
-    if(iArr.inodeArr[inum] == -1) {
-        return -1;
-    }
+    if(iArr.inodeArr[inum] == -1) return -1;
     
-    //read inode
+    //read in the inode
     inode_t inode;
-    lseek(fdDisk, iArr.inodeArr[inum], 0);
+    lseek(fdDisk, iArr.inodeArr[inum], SEEK_SET);
     read(fdDisk, &inode, sizeof(inode_t));
     
-    if(inode.stat.type != 1) {
-        return -1;
-    }
+    if(inode.stat.type != 1) return -1;
     
     if(inode.blockArr[blk] == -1) {
         int endLogTmp = chkpt.endLog;
-        dir_t nDirBlk;
-        int i;
-        for(i = 0; i < 128; i++) {
-            sprintf(nDirBlk.dirArr[i].name, "\0");
-            nDirBlk.dirArr[i].inum = -1;
-        }
-        lseek(fdDisk, chkpt.endLog, 0);
-        write(fdDisk, &nDirBlk, sizeof(dir_t));
-        
-        chkpt.endLog += 4096;
-        lseek(fdDisk, 0, 0);
+        chkpt.endLog += BUFFER_SIZE;
+
+        lseek(fdDisk, 0, SEEK_SET);
         write(fdDisk, &chkpt, sizeof(checkpoint_t));
         
         inode.blockArr[blk] = endLogTmp;
-        inode.stat.size = (blk + 1) * 4096;
-        lseek(fdDisk, iArr.inodeArr[inum], 0);
+        inode.stat.size +=  BUFFER_SIZE;
+        lseek(fdDisk, iArr.inodeArr[inum], SEEK_SET);
         write(fdDisk, &inode, sizeof(inode_t));
         lseek(fdDisk, endLogTmp, 0);
+        write(fdDisk, buff, BUFFER_SIZE);
     }
     else {
-        inode.stat.size = (blk + 1) * 4096;
-        lseek(fdDisk, iArr.inodeArr[inum], 0);
+        lseek(fdDisk, iArr.inodeArr[inum], SEEK_SET);
         write(fdDisk, &inode, sizeof(inode_t));
-        lseek(fdDisk, inode.blockArr[blk], 0);
+        lseek(fdDisk, inode.blockArr[blk], SEEK_SET);
+        write(fdDisk, buff, BUFFER_SIZE);
     }
-    write(fdDisk, buff, 4096);
-    printf("buffer: %s\n", buff);
     loadMem();
     return 0;
 }
