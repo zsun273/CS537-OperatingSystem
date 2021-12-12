@@ -80,7 +80,7 @@ int initImage(char *imgName) {
         //create the root
         imap_t imap;
         //clear out inode arrays
-        for(i = 0; i < 16; i++) {
+        for(int i = 0; i < 16; i++) {
             imap.inodeArr[i] = -1;
         }
 
@@ -94,7 +94,7 @@ int initImage(char *imgName) {
         //make it a directory
         root.stat.type = 0;
         //initialize all to -1
-        for(i = 0; i < 14; i++) {
+        for(int i = 0; i < 14; i++) {
             root.blockArr[i] = -1;
         }
 
@@ -106,7 +106,7 @@ int initImage(char *imgName) {
         //write first directory block
         dir_t rootDir;
         int sent = sizeof(dir_t)/sizeof(rootDir.dirArr[0]);
-        for(i = 0; i < sent; i++) {
+        for(int i = 0; i < sent; i++) {
             rootDir.dirArr[i].inum = -1;
             sprintf(rootDir.dirArr[i].name, "\0");
         }
@@ -131,6 +131,8 @@ int initImage(char *imgName) {
         iArr.inodeArr[i] = -1;
     }
 
+    int i;
+    int j;
     int k;
     imap_t imapTemp;
     while(chkpt.imap[i] >= 0) {
