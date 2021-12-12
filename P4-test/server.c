@@ -14,7 +14,6 @@ int sLookup(int pinum, char *name);
 int sCreate(int pinum, int type, char *name);
 int cInode(int pinum, int type);
 int delInode(int inum);
-int delImap(int imapInd);
 void handle(char * msgBuff);
 int shutDown();
 
@@ -372,19 +371,12 @@ int sCreate(int pinum, int type, char *name) {
 int delInode(int inum) {
     int imapInd = inum / 16;
     int imapInIndex = inum % 16;
-//    if(imapInIndex < 0) {
-//        return -1;
-//    }
     
     imap_t imapTmp;
     lseek(fdDisk, chkpt.imap[imapInd], SEEK_SET);
     read(fdDisk, &imapTmp, sizeof(imap_t));
     
     imapTmp.inodeArr[imapInIndex] = -1;
-//    int i = 0;
-//    while(imapTmp.inodeArr[i] > 0 && i < 16) {
-//        i++;
-//    }
     int empty = 0;
     for (int j = 0; j < 16; ++j) {
         if (imapTmp.inodeArr[j] > 0){
@@ -392,7 +384,6 @@ int delInode(int inum) {
         }
     }
     if(empty == 0) { // this imap is empty, all -1, delete the imap
-        //delImap(imapInd);
         chkpt.imap[imapInd] = -1;
         lseek(fdDisk, 0, SEEK_SET);
         write(fdDisk, &chkpt, sizeof(checkpoint_t));
@@ -401,17 +392,6 @@ int delInode(int inum) {
         lseek(fdDisk, chkpt.imap[imapInd], SEEK_SET);
         write(fdDisk, &imapTmp, sizeof(imapTmp));
     }
-    loadMem();
-    return 0;
-}
-
-int delImap(int imapInd) {
-    loadMem();
-    chkpt.imap[imapInd] = -1;
-    
-    //write to disk
-    lseek(fdDisk, 0, 0);
-    write(fdDisk, &chkpt, sizeof(checkpoint_t));
     loadMem();
     return 0;
 }

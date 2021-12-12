@@ -78,7 +78,7 @@ int MFS_Stat(int inum, MFS_Stat_t *m) {
     msg.lib = STAT;
     msg.pinum = -1;
     msg.type = -1;
-    msg.returnNum -1;
+    msg.returnNum = -1;
     
     int rc;
     valReturn = 0;
