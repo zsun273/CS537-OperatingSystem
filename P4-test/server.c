@@ -387,7 +387,7 @@ int delInode(int inum) {
 //    }
     int empty = 0;
     for (int j = 0; j < 16; ++j) {
-        if (imapTmp.inodeArr[i] > 0){
+        if (imapTmp.inodeArr[j] > 0){
             empty ++;
         }
     }
