@@ -44,12 +44,12 @@ int main(int argc, char *argv[]) {
     
     while (1) {
         char buffer[sizeof(msg_t)];
-        printf("server:: waiting...\n");
+        //printf("server:: waiting...\n");
         int rc = UDP_Read(sd, &s, buffer, sizeof(msg_t));
         if (rc > 0) {
             handle(buffer);
             rc = UDP_Write(sd, &s, buffer, sizeof(msg_t));
-            printf("server:: reply\n");
+            //printf("server:: reply\n");
         }
     }
     return 0;
@@ -62,7 +62,7 @@ int initImage(char *imgName) {
         fdDisk = open(imgName, O_RDWR | O_CREAT | O_TRUNC, S_IRWXU);
 
         // initialize the checkpoint region
-        for(i = 0; i < 256; i++) {
+        for(int i = 0; i < 256; i++) {
             chkpt.imap[i] = -1;
         }
         chkpt.imap[0] = sizeof(checkpoint_t); // imap starts right after checkpoint region
@@ -86,7 +86,7 @@ int initImage(char *imgName) {
         
         //write first directory block
         dir_t rootDir;
-        for(int i = 0; i < 64; i++) { // TODO: upper bound need to change here
+        for(int i = 0; i < 128; i++) { // TODO: upper bound need to change here
             rootDir.dirArr[i].inum = -1;
             sprintf(rootDir.dirArr[i].name, "x");
         }
@@ -186,7 +186,7 @@ int sWrite(int inum, char *buff, int blk) {
         int endLogTmp = chkpt.endLog;
         dir_t nDirBlk;
         int i;
-        for(i = 0; i < 64; i++) {
+        for(i = 0; i < 128; i++) {
             sprintf(nDirBlk.dirArr[i].name, "\0");
             nDirBlk.dirArr[i].inum = -1;
         }
@@ -231,7 +231,7 @@ int sUnlink(int pinum, char *name) {
         return -1;
     }
     
-    if(strlen(name) > 60 || strlen(name) < 0) {
+    if(strlen(name) > 28 || strlen(name) < 0) {
         return -1;
     }
     
@@ -256,7 +256,7 @@ int sUnlink(int pinum, char *name) {
         if(pInode.blockArr[i] >= 0) {
             lseek(fdDisk, pInode.blockArr[i], 0);
             read(fdDisk, &dirBlk, sizeof(dir_t));
-            for(j = 0; j < 64; j++) {
+            for(j = 0; j < 128; j++) {
                 if(strcmp(dirBlk.dirArr[j].name, name) == 0) {
                     found = 1;
                     delInodeLoc = iArr.inodeArr[dirBlk.dirArr[j].inum];
@@ -324,7 +324,7 @@ int sStat(int inum, MFS_Stat_t *m) {
 
 int sLookup(int pinum, char *name) {
     if(pinum < 0 || pinum >= 4096) return -1;
-    if(strlen(name) < 1 || strlen(name) > 60) return -1; // TODO: name should be at most 28 bytes
+    if(strlen(name) < 1 || strlen(name) > 28) return -1; // TODO: name should be at most 28 bytes
     loadMem();
     //check if parent inode number  is valid
     if(iArr.inodeArr[pinum] == -1) return -1;
@@ -341,7 +341,7 @@ int sLookup(int pinum, char *name) {
         lseek(fdDisk, dirBlk, 0);
         dir_t dirBlkTmp;
         read(fdDisk, &dirBlkTmp, sizeof(dir_t));
-        for(int j = 0; j < 64; j++) { // TODO: upper bound should be 128
+        for(int j = 0; j < 128; j++) { // TODO: upper bound should be 128
             // find the matched name and return
             if(strcmp(dirBlkTmp.dirArr[j].name, name) == 0) {
                 return dirBlkTmp.dirArr[j].inum;
@@ -358,7 +358,7 @@ int sCreate(int pinum, int type, char *name) {
     }
     
     //check name size too see if too long or too short
-    if(strlen(name) < 1 || strlen(name) >= 60) {
+    if(strlen(name) < 1 || strlen(name) >= 28) {
         return -1;
     }
     
@@ -400,7 +400,7 @@ int sCreate(int pinum, int type, char *name) {
         pInode.blockArr[iDirBlkInd] = chkpt.endLog;
         dir_t newDirBlk;
         int i;
-        for(i = 0; i < 64; i++) {
+        for(i = 0; i < 128; i++) {
             sprintf(newDirBlk.dirArr[i].name, "\0");
             newDirBlk.dirArr[i].inum = -1;
         }
@@ -422,7 +422,7 @@ int sCreate(int pinum, int type, char *name) {
     
     int nInd = dirBlkInd;
     sprintf(dirBlk.dirArr[nInd].name, "\0");
-    sprintf(dirBlk.dirArr[nInd].name, name, 60);
+    sprintf(dirBlk.dirArr[nInd].name, name, 28);
     dirBlk.dirArr[nInd].inum = newInum;
     
     //write to updated directory
@@ -548,8 +548,8 @@ int cInode(int pinum, int type) {
     
     if(type == 0) {
         dir_t dirBlk;
-        int k = sizeof(dirBlk)/sizeof(dirBlk.dirArr[0]);
-        for(i = 0; i < k; i++) {
+        //int k = sizeof(dirBlk)/sizeof(dirBlk.dirArr[0]);
+        for(i = 0; i < 128; i++) {
             dirBlk.dirArr[i].inum = -1;
             sprintf(dirBlk.dirArr[i].name, "\0");
         }
