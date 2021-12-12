@@ -26,6 +26,7 @@ char name[256];
 int fdDisk;
 checkpoint_t chkpt;
 inodeArr_t iArr;
+int unlink_times = 0
 
 int main(int argc, char *argv[]) {
     if(argc != 3) {
@@ -270,6 +271,9 @@ int sUnlink(int pinum, char *name) {
     lseek(fdDisk, pinumLoc, 0);
     write(fdDisk, &pInode, sizeof(inode_t));
     loadMem();
+
+    unlink_times ++;
+    printf("unlink times: %d\n", unlink_times);
     return 0;
 }
 
