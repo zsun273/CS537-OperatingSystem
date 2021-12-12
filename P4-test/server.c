@@ -26,7 +26,7 @@ char name[256];
 int fdDisk;
 checkpoint_t chkpt;
 inodeArr_t iArr;
-int unlink_times = 0
+int unlink_times = 0;
 
 int main(int argc, char *argv[]) {
     if(argc != 3) {
