@@ -40,12 +40,10 @@ int main(int argc, char *argv[]) {
 
     while (1) {
         char buffer[sizeof(msg_t)];
-        //printf("server:: waiting...\n");
         int rc = UDP_Read(sd, &s, buffer, sizeof(msg_t));
         if (rc > 0) {
             handle(buffer);
             rc = UDP_Write(sd, &s, buffer, sizeof(msg_t));
-            //printf("server:: reply\n");
         }
     }
     return 0;
@@ -114,10 +112,6 @@ int initImage(char *imgName) {
 int loadMem() {
     lseek(fdDisk, 0, SEEK_SET);
     read(fdDisk, &chkpt, sizeof(checkpoint_t));
-
-//    for(int i = 0; i < 4096; i++) {
-//        iArr.inodeArr[i] = -1;
-//    }
 
     //store all inode info
     int k = 0;
@@ -198,8 +192,6 @@ int sWrite(int inum, char *buff, int blk) {
 }
 
 int sUnlink(int pinum, char *name) {
-    //loadMem();
-
     if(pinum < 0 || pinum > 4096) return -1;
     if(iArr.inodeArr[pinum] == -1) return -1;
     //test to see if name is equivalent to parent or current directory
@@ -434,7 +426,6 @@ int cInode(int pinum, int type) {
         write(fdDisk, &chkpt, sizeof(checkpoint_t));
         lseek(fdDisk, chkpt.imap[emptyMapNum], SEEK_SET);
         write(fdDisk, &nimap, sizeof(imap_t));
-        //loadMem();
     }
 
     imap_t imapTmp;
