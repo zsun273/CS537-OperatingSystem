@@ -30,7 +30,6 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     int portNum = atoi(argv[1]);
-    //sprintf(name, argv[2]);
 
     sd = UDP_Open(portNum); // use a port number to open
     assert(sd > -1);
@@ -199,7 +198,7 @@ int sWrite(int inum, char *buff, int blk) {
 }
 
 int sUnlink(int pinum, char *name) {
-    loadMem();
+    //loadMem();
 
     if(pinum < 0 || pinum > 4096) return -1;
     if(iArr.inodeArr[pinum] == -1) return -1;
@@ -395,7 +394,7 @@ int delInode(int inum) {
         lseek(fdDisk, chkpt.imap[imapInd], SEEK_SET);
         write(fdDisk, &imapTmp, sizeof(imapTmp));
     }
-    loadMem();
+    //loadMem();
     return 0;
 }
 
@@ -435,7 +434,7 @@ int cInode(int pinum, int type) {
         write(fdDisk, &chkpt, sizeof(checkpoint_t));
         lseek(fdDisk, chkpt.imap[emptyMapNum], SEEK_SET);
         write(fdDisk, &nimap, sizeof(imap_t));
-        loadMem();
+        //loadMem();
     }
 
     imap_t imapTmp;
@@ -460,8 +459,7 @@ int cInode(int pinum, int type) {
         chkpt.endLog += sizeof(nInode);
 
         dir_t dirBlk;
-        int k = sizeof(dirBlk)/sizeof(dirBlk.dirArr[0]);
-        for(int i = 0; i < k; i++) {
+        for(int i = 0; i < 128; i++) {
             dirBlk.dirArr[i].inum = -1;
             sprintf(dirBlk.dirArr[i].name, "x");
         }
