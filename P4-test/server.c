@@ -103,6 +103,10 @@ int initImage(char *imgName) {
         read(fdDisk, &chkpt, sizeof(checkpoint_t));
     }
 
+    for(int i = 0; i < 4096; i++) {
+        iArr.inodeArr[i] = -1;
+    }
+
     loadMem();
 
     return 0;
@@ -112,9 +116,9 @@ int loadMem() {
     lseek(fdDisk, 0, SEEK_SET);
     read(fdDisk, &chkpt, sizeof(checkpoint_t));
 
-    for(int i = 0; i < 4096; i++) {
-        iArr.inodeArr[i] = -1;
-    }
+//    for(int i = 0; i < 4096; i++) {
+//        iArr.inodeArr[i] = -1;
+//    }
 
     //store all inode info
     int k = 0;
@@ -258,7 +262,7 @@ int sUnlink(int pinum, char *name) {
     lseek(fdDisk, iArr.inodeArr[pinum], SEEK_SET);
     write(fdDisk, &pInode, sizeof(inode_t));
 
-    loadMem();
+    //loadMem();
     return 0;
 }
 
@@ -312,6 +316,7 @@ int sCreate(int pinum, int type, char *name) {
     if(pinum < 0 || pinum > 4096) return -1;
     if(type != MFS_DIRECTORY && type != MFS_REGULAR_FILE) return -1;
     if(strlen(name) < 1 || strlen(name) >= 28) return -1;
+    loadMem();
     if(iArr.inodeArr[pinum] == -1) return -1;
     if(sLookup(pinum, name) >= 0) return 0; // name exist, return success
 
@@ -363,7 +368,7 @@ int sCreate(int pinum, int type, char *name) {
     lseek(fdDisk, pInode.blockArr[iDirBlkInd], 0);
     write(fdDisk, &dirBlk, sizeof(dir_t));
 
-    loadMem();
+    //loadMem();
     return 0;
 }
 
@@ -391,7 +396,7 @@ int delInode(int inum) {
         lseek(fdDisk, chkpt.imap[imapInd], SEEK_SET);
         write(fdDisk, &imapTmp, sizeof(imapTmp));
     }
-    loadMem();
+    //loadMem();
     return 0;
 }
 
@@ -431,7 +436,7 @@ int cInode(int pinum, int type) {
         write(fdDisk, &chkpt, sizeof(checkpoint_t));
         lseek(fdDisk, chkpt.imap[emptyMapNum], SEEK_SET);
         write(fdDisk, &nimap, sizeof(imap_t));
-        loadMem();
+        //loadMem();
     }
 
     imap_t imapTmp;
@@ -485,7 +490,7 @@ int cInode(int pinum, int type) {
     // updated checkpoint region
     lseek(fdDisk, 0, SEEK_SET);
     write(fdDisk, &chkpt, sizeof(checkpoint_t));
-    loadMem();
+    //loadMem();
     return nInodeNum;
 }
 
