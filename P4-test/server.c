@@ -143,7 +143,7 @@ int sRead(int inum, char *buff, int blk) {
     //loadMem();
     
     //if(iArr.inodeArr[inum] == -1) return -1;
-    int inodeLoc = checkInum(pinum);
+    int inodeLoc = checkInum(inum);
     if (inodeLoc == -1) return -1;
 
     // read in the inode
@@ -165,7 +165,7 @@ int sWrite(int inum, char *buff, int blk) {
     //loadMem();
     
     //if(iArr.inodeArr[inum] == -1) return -1;
-    int inodeLoc = checkInum(pinum);
+    int inodeLoc = checkInum(inum);
     if (inodeLoc == -1) return -1;
 
     //read in the inode
@@ -280,7 +280,7 @@ int sStat(int inum, MFS_Stat_t *m) {
     //loadMem();
 
     //if(iArr.inodeArr[inum] == -1) return -1;
-    int inodeLoc = checkInum(pinum);
+    int inodeLoc = checkInum(inum);
     if (inodeLoc == -1) return -1;
 
     inode_t inode;
