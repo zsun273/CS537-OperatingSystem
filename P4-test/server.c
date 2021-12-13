@@ -155,6 +155,7 @@ int sRead(int inum, char *buff, int blk) {
     
     lseek(fdDisk, inode.blockArr[blk], SEEK_SET);
     read(fdDisk, buff, BUFFER_SIZE);
+    fsync(fdDisk);
     return 0;
 }
 
@@ -241,7 +242,10 @@ int sUnlink(int pinum, char *name) {
         }
     }
     
-    if(found == 0) return 0; // name not existing is not a failure
+    if(found == 0) {
+        fsync(fdDisk);
+        return 0; // name not existing is not a failure
+    }
     
     inode_t inodeDel;
     lseek(fdDisk, delInodeLoc, SEEK_SET);
@@ -289,7 +293,8 @@ int sStat(int inum, MFS_Stat_t *m) {
     
     m->type = inode.stat.type;
     m->size = inode.stat.size;
-    
+
+    fsync(fdDisk);
     return 0;
 }
 
@@ -333,7 +338,10 @@ int sCreate(int pinum, int type, char *name) {
     int inodeLoc = checkInum(pinum);
     if (inodeLoc == -1) return -1;
 
-    if(sLookup(pinum, name) >= 0) return 0; // name exist, return success
+    if(sLookup(pinum, name) >= 0) {
+        fsync(fdDisk);
+        return 0; // name exist, return success
+    }
     
     //get pinum location
     inode_t pInode;
@@ -413,6 +421,7 @@ int delInode(int inum) {
         write(fdDisk, &imapTmp, sizeof(imapTmp));
     }
     //loadMem();
+    fsync(fdDisk);
     return 0;
 }
 
