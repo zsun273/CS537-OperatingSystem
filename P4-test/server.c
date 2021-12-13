@@ -573,6 +573,7 @@ int shutDown() {
 }
 
 int checkInum(int inum){
+    fsync(fdDisk);
     int imap_idx = inum / 16;
     int inode_arr_idx = inum % 16;
     imap_t imapTmp;
