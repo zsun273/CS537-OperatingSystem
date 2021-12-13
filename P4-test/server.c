@@ -142,13 +142,12 @@ int sRead(int inum, char *buff, int blk) {
     if(inum >= 4096 || inum < 0) return -1;
     if(blk > 13 || blk < 0) return -1;
 
-    loadMem();
-
-    if(iArr.inodeArr[inum] == -1) return -1;
+    int inodeLoc = checkInum(inum);
+    if(inodeLoc) return -1;
 
     // read in the inode
     inode_t inode;
-    lseek(fdDisk, iArr.inodeArr[inum], SEEK_SET);
+    lseek(fdDisk, inodeLoc, SEEK_SET);
     read(fdDisk, &inode, sizeof(inode_t));
 
     if(inode.blockArr[blk] == -1) return -1;
@@ -162,13 +161,12 @@ int sWrite(int inum, char *buff, int blk) {
     if(inum >= 4096 || inum < 0) return -1;
     if(blk > 13 || blk < 0) return -1;
 
-    loadMem();
-
-    if(iArr.inodeArr[inum] == -1) return -1;
+    int inodeLoc = checkInum(inum);
+    if(inodeLoc) return -1;
 
     //read in the inode
     inode_t inode;
-    lseek(fdDisk, iArr.inodeArr[inum], SEEK_SET);
+    lseek(fdDisk, inodeLoc, SEEK_SET);
     read(fdDisk, &inode, sizeof(inode_t));
 
     if(inode.stat.type != 1) return -1;
@@ -182,19 +180,18 @@ int sWrite(int inum, char *buff, int blk) {
 
         inode.blockArr[blk] = endLogTmp;
         inode.stat.size =  (blk + 1) * 4096;
-        lseek(fdDisk, iArr.inodeArr[inum], SEEK_SET);
+        lseek(fdDisk, inodeLoc, SEEK_SET);
         write(fdDisk, &inode, sizeof(inode_t));
         lseek(fdDisk, endLogTmp, 0);
         write(fdDisk, buff, BUFFER_SIZE);
     }
     else {
         inode.stat.size = (blk + 1) * 4096;
-        lseek(fdDisk, iArr.inodeArr[inum], SEEK_SET);
+        lseek(fdDisk, inodeLoc, SEEK_SET);
         write(fdDisk, &inode, sizeof(inode_t));
         lseek(fdDisk, inode.blockArr[blk], SEEK_SET);
         write(fdDisk, buff, BUFFER_SIZE);
     }
-    loadMem();
     return 0;
 }
 
@@ -262,19 +259,19 @@ int sUnlink(int pinum, char *name) {
     lseek(fdDisk, iArr.inodeArr[pinum], SEEK_SET);
     write(fdDisk, &pInode, sizeof(inode_t));
 
-    //loadMem();
+    loadMem();
     return 0;
 }
 
 int sStat(int inum, MFS_Stat_t *m) {
     if(inum < 0 || inum >= 4096 ) return -1;
     if (fdDisk < 0) return -1;
-    loadMem();
 
-    if(iArr.inodeArr[inum] == -1) return -1;
+    int inodeLoc = checkInum(inum);
+    if(inodeLoc) return -1;
 
     inode_t inode;
-    lseek(fdDisk, iArr.inodeArr[inum], 0);
+    lseek(fdDisk, inodeLoc, 0);
     read(fdDisk, &inode, sizeof(inode_t));
 
     m->type = inode.stat.type;
@@ -286,13 +283,15 @@ int sStat(int inum, MFS_Stat_t *m) {
 int sLookup(int pinum, char *name) {
     if(pinum < 0 || pinum >= 4096) return -1;
     if(strlen(name) < 1 || strlen(name) > 28) return -1; // TODO: name should be at most 28 bytes
-    loadMem();
+
+
     //check if parent inode number  is valid
-    if(iArr.inodeArr[pinum] == -1) return -1;
+    int inodeLoc = checkInum(pinum);
+    if(inodeLoc) return -1;
 
     //read the parent inode
     inode_t pInode;
-    lseek(fdDisk, iArr.inodeArr[pinum], 0);
+    lseek(fdDisk, inodeLoc, 0);
     read(fdDisk, &pInode, sizeof(pInode));
     if(pInode.stat.type != MFS_DIRECTORY) return -1;
 
@@ -368,7 +367,7 @@ int sCreate(int pinum, int type, char *name) {
     lseek(fdDisk, pInode.blockArr[iDirBlkInd], 0);
     write(fdDisk, &dirBlk, sizeof(dir_t));
 
-    //loadMem();
+    loadMem();
     return 0;
 }
 
@@ -396,7 +395,7 @@ int delInode(int inum) {
         lseek(fdDisk, chkpt.imap[imapInd], SEEK_SET);
         write(fdDisk, &imapTmp, sizeof(imapTmp));
     }
-    //loadMem();
+    loadMem();
     return 0;
 }
 
@@ -436,7 +435,7 @@ int cInode(int pinum, int type) {
         write(fdDisk, &chkpt, sizeof(checkpoint_t));
         lseek(fdDisk, chkpt.imap[emptyMapNum], SEEK_SET);
         write(fdDisk, &nimap, sizeof(imap_t));
-        //loadMem();
+        loadMem();
     }
 
     imap_t imapTmp;
@@ -490,7 +489,7 @@ int cInode(int pinum, int type) {
     // updated checkpoint region
     lseek(fdDisk, 0, SEEK_SET);
     write(fdDisk, &chkpt, sizeof(checkpoint_t));
-    //loadMem();
+    loadMem();
     return nInodeNum;
 }
 
