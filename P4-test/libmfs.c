@@ -1,24 +1,17 @@
 #include "mfs.h"
 #include "udp.h"
 
-//get buffer
 char buffer[4096];
-
-//sock addr struct
 struct sockaddr_in addr;
 int fd;
-int portNum;
 struct timeval timeCheck;
 fd_set rfds;
 
 int MFS_Init(char *hostname, int port) {
-    portNum = port;
     fd = UDP_Open(0);
     assert(fd > -1);
-    
-    int rc = UDP_FillSockAddr(&addr, hostname, portNum);
+    int rc = UDP_FillSockAddr(&addr, hostname, port);
     assert(rc == 0);
-    
     return rc;
 }
 
@@ -32,10 +25,11 @@ int MFS_Lookup(int pinum, char *name) {
     msg.pinum = pinum;
     msg.type = -1;
     msg.lib = LOOKUP;
+    msg.returnNum = -1;
     //get name
     memcpy(msg.name, name, sizeof(msg.name));
-    sprintf(msg.buffer, "Hello");
-    msg.returnNum = -1;
+    sprintf(msg.buffer, "Default");
+
     
     valReturn = 0;
     int rc;
@@ -52,8 +46,6 @@ int MFS_Lookup(int pinum, char *name) {
         timeCheck.tv_usec = 0;
         
         valReturn = select(fd + 1, &rfds, NULL, NULL, &timeCheck);
-        
-        
         if(valReturn) {
             if(rc > 0) {
                 struct sockaddr_in retaddr;
@@ -62,14 +54,11 @@ int MFS_Lookup(int pinum, char *name) {
             }
         }
     }
-    
     return msg.returnNum;
 }
 
 
-//returns infomation about data given
 int MFS_Stat(int inum, MFS_Stat_t *m) {
-    
     int valReturn;
     
     msg_t msg;
@@ -78,7 +67,7 @@ int MFS_Stat(int inum, MFS_Stat_t *m) {
     msg.lib = STAT;
     msg.pinum = -1;
     msg.type = -1;
-    msg.returnNum -1;
+    msg.returnNum = -1;
     
     int rc;
     valReturn = 0;
@@ -107,11 +96,7 @@ int MFS_Stat(int inum, MFS_Stat_t *m) {
     return msg.returnNum;
 }
 
-
-
-//write new
 int MFS_Write(int inum, char *buffer, int block) {
-    
     int valReturn;
     msg_t msg;
     msg.lib = WRITE;
@@ -139,7 +124,6 @@ int MFS_Write(int inum, char *buffer, int block) {
     }
     
     return msg.returnNum;
-    
 }
 
 int MFS_Read(int inum, char *buffer, int block) {
@@ -147,7 +131,7 @@ int MFS_Read(int inum, char *buffer, int block) {
     msg_t msg;
     
     msg.inum = inum;
-    sprintf(msg.buffer, buffer);
+    memcpy(msg.buffer, buffer, 4096);
     msg.block = block;
     msg.lib = READ;
     msg.type = -1;
@@ -169,7 +153,6 @@ int MFS_Read(int inum, char *buffer, int block) {
             if(rc > 0) {
                 struct sockaddr_in retaddr;
                 rc = UDP_Read(fd, &retaddr, (char *)&msg, sizeof(msg_t));
-                printf("read: %s\n", msg.buffer);
             }
         }
         
@@ -182,8 +165,8 @@ int MFS_Read(int inum, char *buffer, int block) {
 int MFS_Creat(int pinum, int type, char *name) {
     int valReturn;
     msg_t msg;
-    
-    sprintf(msg.name, name);
+
+    memcpy(msg.name, name, sizeof(msg.name));
     msg.type = type;
     msg.pinum = pinum;
     msg.lib = CREAT;
@@ -208,17 +191,15 @@ int MFS_Creat(int pinum, int type, char *name) {
                 rc = UDP_Read(fd, &retaddr, (char *)&msg, sizeof(msg_t));
             }
         }
-        
     }
-    
     return msg.returnNum;
 }
 
 int MFS_Unlink(int pinum, char *name) {
     int valReturn;
     msg_t msg;
-    
-    sprintf(msg.name, name);
+
+    memcpy(msg.name, name, sizeof(msg.name));
     msg.pinum = pinum;
     msg.lib = UNLINK;
     msg.inum = -1;
@@ -243,14 +224,11 @@ int MFS_Unlink(int pinum, char *name) {
                 rc = UDP_Read(fd, &retaddr, (char *)&msg, sizeof(msg_t));
             }
         }
-        
     }
-    
     return msg.returnNum;
 }
 
 int MFS_Shutdown() {
-    
     msg_t msg;
     msg.lib = SHUTDOWN;
     msg.returnNum = 0;
@@ -260,6 +238,5 @@ int MFS_Shutdown() {
         struct sockaddr_in retaddr;
         rc = UDP_Read(fd, &retaddr, (char *)&msg, sizeof(msg_t));
     }
-    
     return 0;
 }

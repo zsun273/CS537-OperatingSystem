@@ -7,16 +7,16 @@ char buffer[4096];
 //sock addr struct
 struct sockaddr_in addr;
 int fd;
-int portNum;
+int port_number;
 struct timeval timeCheck;
 fd_set rfds;
 
 int MFS_Init(char *hostname, int port) {
-    portNum = port;
+    port_number = port;
     fd = UDP_Open(0);
     assert(fd > -1);
 
-    int rc = UDP_FillSockAddr(&addr, hostname, portNum);
+    int rc = UDP_FillSockAddr(&addr, hostname, port_number);
     assert(rc == 0);
     return rc;
 }
