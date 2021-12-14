@@ -2,7 +2,7 @@
 #include "udp.h"
 #include "mfs.h"
 
-#define BUFFER_SIZE (4096)
+#define BUFFER_SIZE 4096
 
 int init_image(char *image);
 void set_return_number(char * buffer);
@@ -15,12 +15,12 @@ int server_stat(int inum, MFS_Stat_t *m);
 int server_lookup(int pinum, char *name);
 int server_create(int pinum, int type, char *name);
 int create_inode_imap(int pinum, int type);
-int server_shutDown();
+//int server_shutDown();
 
-int sd;                 // global socket descriptor
 struct sockaddr_in s;
-char name[256];
+int sd;                 // global socket descriptor
 int fd;                 // global file descriptor
+char name[256];
 checkpoint_t CR;        // checkpoint region for log
 inodeArr_t inode_locs;  // all inode locations
 
@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
     sd = UDP_Open(port); // use a port number to open
     assert(sd > -1);
 
-    //init the server image
+    //initialize the file system image
     init_image(argv[2]);
     load_inode_loc();
 
@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
 void set_return_number(char * buffer) {
     MFS_Msg_t *msg = (MFS_Msg_t*) buffer;
     msg->returnNum = -1;
-
+    // set the return number for each different library call
     switch(msg->lib) {
         case INIT:
             msg->returnNum = init_image(name);
@@ -148,7 +148,7 @@ int load_inode_loc() {
     lseek(fd, 0, SEEK_SET);
     read(fd, &CR, sizeof(checkpoint_t));
 
-    //store all inode info
+    //store all inode start locations
     int idx = 0;
     imap_t imap_copy;
     for(int i = 0; i < 256; i++) {
@@ -171,7 +171,6 @@ int server_read(int inum, char *buff, int blk) {
     if(blk > 13 || blk < 0) return -1;
 
     load_inode_loc();
-
     if(inode_locs.inodeArr[inum] == -1) return -1;
 
     // read in the inode
@@ -188,10 +187,9 @@ int server_read(int inum, char *buff, int blk) {
 
 int server_write(int inum, char *buff, int blk) {
     if(inum >= 4096 || inum < 0) return -1;
-    if(blk > 13 || blk < 0) return -1;
+    if(blk >= 14 || blk < 0) return -1;
 
     load_inode_loc();
-
     if(inode_locs.inodeArr[inum] == -1) return -1;
 
     //read in the inode
@@ -199,24 +197,24 @@ int server_write(int inum, char *buff, int blk) {
     lseek(fd, inode_locs.inodeArr[inum], SEEK_SET);
     read(fd, &inode, sizeof(inode_t));
 
-    if(inode.stat.type != 1) return -1;
+    if(inode.stat.type != MFS_REGULAR_FILE) return -1;
 
-    if(inode.blockArr[blk] == -1) {
-        int endoflog = CR.endLog;
+    if(inode.blockArr[blk] == -1) { // block is empty, write in
+        int end_log = CR.endLog;
         CR.endLog += BUFFER_SIZE;
 
         lseek(fd, 0, SEEK_SET);
         write(fd, &CR, sizeof(checkpoint_t));
 
-        inode.blockArr[blk] = endoflog;
+        inode.blockArr[blk] = end_log;
         inode.stat.size =  (blk + 1) * 4096;
         lseek(fd, inode_locs.inodeArr[inum], SEEK_SET);
         write(fd, &inode, sizeof(inode_t));
-        lseek(fd, endoflog, SEEK_SET);
+        lseek(fd, end_log, SEEK_SET);
         write(fd, buff, BUFFER_SIZE);
     }
     else {
-        inode.stat.size = (blk + 1) * 4096;
+        inode.stat.size = (blk + 1) * 4096; // TODO: do we need this?
         lseek(fd, inode_locs.inodeArr[inum], SEEK_SET);
         write(fd, &inode, sizeof(inode_t));
         lseek(fd, inode.blockArr[blk], SEEK_SET);
@@ -508,8 +506,8 @@ int create_inode_imap(int pinum, int type) {
     return first_empty_inum;
 }
 
-int server_shutDown() {
-    close(fd);
-    exit(0);
-    return 0;
-}
+//int server_shutDown() {
+//    close(fd);
+//    exit(0);
+//    return 0;
+//}
