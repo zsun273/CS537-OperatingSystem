@@ -80,7 +80,24 @@ int MFS_Write(int inum, char *buffer, int block) {
     msg.block = block;
     memcpy(msg.buffer, buffer, 4096);
 
-    msg = communicate(&msg);
+    int rc;
+    int valReturn = 0;
+    while(valReturn == 0) {
+        rc = UDP_Write(fd, &addr, (char*)&msg, sizeof(msg_t));
+        FD_ZERO(&rfds);
+        FD_SET(fd, &rfds);
+        timeCheck.tv_sec = 5;
+        timeCheck.tv_usec = 0;
+        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeCheck);
+
+        if(valReturn) {
+            if(rc > 0) {
+                struct sockaddr_in retaddr;
+                rc = UDP_Read(fd, &retaddr, (char *)&msg, sizeof(msg_t));
+            }
+        }
+
+    }
     return msg.returnNum;
 }
 
@@ -103,6 +120,7 @@ int MFS_Read(int inum, char *buffer, int block) {
 
 int MFS_Creat(int pinum, int type, char *name) {
     msg_t msg;
+
     memcpy(msg.name, name, sizeof(msg.name));
     msg.type = type;
     msg.pinum = pinum;
@@ -111,12 +129,28 @@ int MFS_Creat(int pinum, int type, char *name) {
     msg.block = -1;
     msg.returnNum = -1;
 
-    msg = communicate(&msg);
+    int rc;
+    int valReturn = 0;
+    while(valReturn == 0) {
+        rc = UDP_Write(fd, &addr, (char*)&msg, sizeof(msg_t));
+        FD_ZERO(&rfds);
+        FD_SET(fd, &rfds);
+        timeCheck.tv_sec = 5;
+        timeCheck.tv_usec = 0;
+        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeCheck);
+        if(valReturn) {
+            if(rc > 0) {
+                struct sockaddr_in retaddr;
+                rc = UDP_Read(fd, &retaddr, (char *)&msg, sizeof(msg_t));
+            }
+        }
+    }
     return msg.returnNum;
 }
 
 int MFS_Unlink(int pinum, char *name) {
     msg_t msg;
+
     memcpy(msg.name, name, sizeof(msg.name));
     msg.pinum = pinum;
     msg.lib = UNLINK;
