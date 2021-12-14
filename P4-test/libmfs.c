@@ -7,7 +7,7 @@ int fd;
 fd_set fdSet;
 struct timeval time_eval;
 
-MFS_Msg_t communicate(struct MFS_Msg_t* msg){
+MFS_Msg_t communicate(MFS_Msg_t* msg){
     int return_val = 0;
     int rc;
     while(return_val == 0) {
