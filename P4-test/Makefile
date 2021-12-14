@@ -3,21 +3,19 @@ OPTS = -Wall -g
 
 all: libmfs server client
 
-# this generates the target executables
 server: server.o udp.o
 	$(CC) -o server server.o udp.o 
 
 client: client.o udp.o
 	$(CC) -o client client.o udp.o  libmfs.so
 
-libmfs: udp.o mfs.o
+libmfs: udp.o libmfs.o
 	$(CC) -shared -g -Wall -o libmfs.so udp.o libmfs.o
 udp.o:
 	$(CC) $(OPTS) -c -fpic udp.c -o udp.o
-mfs.o:
+libmfs.o:
 	$(CC) $(OPTS) -c -fpic libmfs.c -o libmfs.o
 
-# this is a generic rule for .o files 
 %.o: %.c 
 	$(CC) $(OPTS) -c $< -o $@
 

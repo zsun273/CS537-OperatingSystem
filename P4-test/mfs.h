@@ -17,35 +17,36 @@ typedef struct __MFS_DirEnt_t {
     int  inum;      // inode number of entry (-1 means entry not used)
 } MFS_DirEnt_t;
 
-//define a checkpoint
-//256 places in checkpoint it must point to
+//struct for the checkpoint region
 typedef struct checkpoint_t {
     int imap[256];
-    int endLog; //end of file
+    int endLog; //end of the log
 } checkpoint_t;
 
-//inode
+//struct for inode
 typedef struct inode_t {
     MFS_Stat_t stat;
     int blockArr[14];
 } inode_t;
 
-//imap that will contain pointers to inodes
+// struct for inode map pieces
+// one inode map piece can point to 16 inodes
 typedef struct imap_t {
     int inodeArr[16];
 } imap_t;
 
-//contain directories
+//struct for directories
+// one directory block can have 128 entries
 typedef struct dir_t {
     MFS_DirEnt_t dirArr[128];
 } dir_t;
 
-//this will contain all inodes
+// struct to store all inode locations
 typedef struct inodeArr_t {
     int inodeArr[4096];
 } inodeArr_t;
 
-//use for library
+//for different library calls
 typedef enum lib_t {
     INIT,
     LOOKUP,
@@ -57,15 +58,10 @@ typedef enum lib_t {
     SHUTDOWN
 } lib_t;
 
-typedef enum type_t {
-    REG, //use for regular types
-    DIR //use for directory types
-} type_t;
-
-//send this struct over the server
+//message struct, send between ports.
 typedef struct msg_t {
-    char name[28]; //name of the directory
-    char buffer[4096]; //buffer
+    char name[28];
+    char buffer[4096];
     int inum;
     int block;
     int type;
@@ -73,7 +69,6 @@ typedef struct msg_t {
     int pinum;
     MFS_Stat_t stat;
     lib_t lib;
-    int regDir; //type of file
 } msg_t;
 
 int MFS_Init(char *hostname, int port);
