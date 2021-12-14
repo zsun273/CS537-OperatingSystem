@@ -6,15 +6,15 @@
 
 int initImage(char *imgName);
 int loadMem();
-int sRead(int inum, char *buff, int blk);
-int sWrite(int inum, char *buff, int blk);
+int sRead(int inum, char *buff, int block);
+int sWrite(int inum, char *buff, int block);
 int sUnlink(int pinum, char *name);
 int sStat(int inum, MFS_Stat_t *m);
 int sLookup(int pinum, char *name);
 int sCreate(int pinum, int type, char *name);
 int cInode(int pinum, int type);
 int delInode(int inum);
-void handle(char * msgBuff);
+void set_return_number(char * buffer);
 int shutDown();
 
 int sd;
@@ -39,11 +39,11 @@ int main(int argc, char *argv[]) {
     loadMem();
 
     while (1) {
-        char buffer[sizeof(msg_t)];
-        int rc = UDP_Read(sd, &s, buffer, sizeof(msg_t));
+        char buffer[sizeof(MFS_Msg_t)];
+        int rc = UDP_Read(sd, &s, buffer, sizeof(MFS_Msg_t));
         if (rc > 0) {
-            handle(buffer);
-            rc = UDP_Write(sd, &s, buffer, sizeof(msg_t));
+            set_return_number(buffer);
+            rc = UDP_Write(sd, &s, buffer, sizeof(MFS_Msg_t));
         }
     }
     return 0;
@@ -276,7 +276,7 @@ int sStat(int inum, MFS_Stat_t *m) {
 
 int sLookup(int pinum, char *name) {
     if(pinum < 0 || pinum >= 4096) return -1;
-    if(strlen(name) < 1 || strlen(name) > 28) return -1; // TODO: name should be at most 28 bytes
+    if(strlen(name) < 1 || strlen(name) > 28) return -1;
     loadMem();
     //check if parent inode number  is valid
     if(iArr.inodeArr[pinum] == -1) return -1;
@@ -293,7 +293,7 @@ int sLookup(int pinum, char *name) {
         lseek(fdDisk, dirBlk, 0);
         dir_t dirBlkTmp;
         read(fdDisk, &dirBlkTmp, sizeof(dir_t));
-        for(int j = 0; j < 128; j++) { // TODO: upper bound should be 128
+        for(int j = 0; j < 128; j++) {
             // find the matched name and return
             if(strcmp(dirBlkTmp.dirArr[j].name, name) == 0) {
                 return dirBlkTmp.dirArr[j].inum;
@@ -386,7 +386,6 @@ int delInode(int inum) {
         lseek(fdDisk, chkpt.imap[imapInd], SEEK_SET);
         write(fdDisk, &imapTmp, sizeof(imapTmp));
     }
-    //loadMem();
     return 0;
 }
 
@@ -482,8 +481,8 @@ int cInode(int pinum, int type) {
     return nInodeNum;
 }
 
-void handle(char * msgBuff) {
-    msg_t *msg = (msg_t*) msgBuff;
+void set_return_number(char * buffer) {
+    MFS_Msg_t *msg = (MFS_Msg_t*) buffer;
     msg->returnNum = -1;
 
     switch(msg->lib) {
@@ -510,13 +509,13 @@ void handle(char * msgBuff) {
             break;
         case SHUTDOWN:
             msg->returnNum = 0;
-            memcpy(msgBuff, msg, sizeof(*msg));
-            UDP_Write(sd, &s, msgBuff, sizeof(msg_t));
+            memcpy(buffer, msg, sizeof(*msg));
+            UDP_Write(sd, &s, buffer, sizeof(MFS_Msg_t));
             fsync(fdDisk);
             close(fdDisk);
             exit(0);
     }
-    memcpy(msgBuff, msg, sizeof(*msg));
+    memcpy(buffer, msg, sizeof(*msg));
 }
 
 int shutDown() {

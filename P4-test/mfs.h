@@ -59,7 +59,7 @@ typedef enum lib_t {
 } lib_t;
 
 //message struct, send between ports.
-typedef struct msg_t {
+typedef struct __MFS_Msg_t {
     char name[28];
     char buffer[4096];
     int inum;
@@ -69,7 +69,7 @@ typedef struct msg_t {
     int pinum;
     MFS_Stat_t stat;
     lib_t lib;
-} msg_t;
+} MFS_Msg_t;
 
 int MFS_Init(char *hostname, int port);
 int MFS_Lookup(int pinum, char *name);

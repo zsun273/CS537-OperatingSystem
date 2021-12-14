@@ -7,11 +7,11 @@ int fd;
 fd_set fdSet;
 struct timeval time_eval;
 
-msg_t communicate(struct msg_t* msg){
+MFS_Msg_t communicate(struct MFS_Msg_t* msg){
     int return_val = 0;
     int rc;
     while(return_val == 0) {
-        rc = UDP_Write(fd, &addr, (char *) msg, sizeof(msg_t));
+        rc = UDP_Write(fd, &addr, (char *) msg, sizeof(MFS_Msg_t));
         FD_ZERO(&fdSet);     //initialize the file descriptor set fdSet to have zero bits for all file descriptors
         FD_SET(fd, &fdSet);
         //wait 5 seconds
@@ -21,7 +21,7 @@ msg_t communicate(struct msg_t* msg){
         if(return_val) {
             if(rc > 0) {
                 struct sockaddr_in retaddr;
-                rc = UDP_Read(fd, &retaddr, (char*) msg, sizeof(msg_t));
+                rc = UDP_Read(fd, &retaddr, (char*) msg, sizeof(MFS_Msg_t));
             }
         }
     }
@@ -37,7 +37,7 @@ int MFS_Init(char *hostname, int port) {
 }
 
 int MFS_Lookup(int pinum, char *name) {
-    msg_t msg;
+    MFS_Msg_t msg;
     msg.pinum = pinum;
     msg.lib = LOOKUP;
     msg.returnNum = -1;
@@ -49,7 +49,7 @@ int MFS_Lookup(int pinum, char *name) {
 
 
 int MFS_Stat(int inum, MFS_Stat_t *m) {
-    msg_t msg;
+    MFS_Msg_t msg;
     msg.inum = inum;
     msg.block = -1;
     msg.lib = STAT;
@@ -61,16 +61,15 @@ int MFS_Stat(int inum, MFS_Stat_t *m) {
 }
 
 int MFS_Write(int inum, char *buffer, int block) {
-    msg_t msg;
+    MFS_Msg_t msg;
     msg.lib = WRITE;
     msg.inum = inum;
     msg.block = block;
     memcpy(msg.buffer, buffer, 4096);
-
     int rc;
     int return_val = 0;
     while(return_val == 0) {
-        rc = UDP_Write(fd, &addr, (char*)&msg, sizeof(msg_t));
+        rc = UDP_Write(fd, &addr, (char*)&msg, sizeof(MFS_Msg_t));
         FD_ZERO(&fdSet);
         FD_SET(fd, &fdSet);
         time_eval.tv_sec = 5;
@@ -80,7 +79,7 @@ int MFS_Write(int inum, char *buffer, int block) {
         if(return_val) {
             if(rc > 0) {
                 struct sockaddr_in retaddr;
-                rc = UDP_Read(fd, &retaddr, (char *)&msg, sizeof(msg_t));
+                rc = UDP_Read(fd, &retaddr, (char *)&msg, sizeof(MFS_Msg_t));
             }
         }
 
@@ -89,7 +88,7 @@ int MFS_Write(int inum, char *buffer, int block) {
 }
 
 int MFS_Read(int inum, char *buffer, int block) {
-    msg_t msg;
+    MFS_Msg_t msg;
     msg.inum = inum;
     memcpy(msg.buffer, buffer, 4096);
     msg.block = block;
@@ -101,17 +100,16 @@ int MFS_Read(int inum, char *buffer, int block) {
 }
 
 int MFS_Creat(int pinum, int type, char *name) {
-    msg_t msg;
+    MFS_Msg_t msg;
     memcpy(msg.name, name, sizeof(msg.name));
     msg.type = type;
     msg.pinum = pinum;
     msg.lib = CREAT;
     msg.returnNum = -1;
-
     int rc;
     int return_val = 0;
     while(return_val == 0) {
-        rc = UDP_Write(fd, &addr, (char*)&msg, sizeof(msg_t));
+        rc = UDP_Write(fd, &addr, (char*)&msg, sizeof(MFS_Msg_t));
         FD_ZERO(&fdSet);
         FD_SET(fd, &fdSet);
         time_eval.tv_sec = 5;
@@ -120,7 +118,7 @@ int MFS_Creat(int pinum, int type, char *name) {
         if(return_val) {
             if(rc > 0) {
                 struct sockaddr_in retaddr;
-                rc = UDP_Read(fd, &retaddr, (char *)&msg, sizeof(msg_t));
+                rc = UDP_Read(fd, &retaddr, (char *)&msg, sizeof(MFS_Msg_t));
             }
         }
     }
@@ -128,7 +126,7 @@ int MFS_Creat(int pinum, int type, char *name) {
 }
 
 int MFS_Unlink(int pinum, char *name) {
-    msg_t msg;
+    MFS_Msg_t msg;
     memcpy(msg.name, name, sizeof(msg.name));
     msg.pinum = pinum;
     msg.lib = UNLINK;
@@ -138,14 +136,14 @@ int MFS_Unlink(int pinum, char *name) {
 }
 
 int MFS_Shutdown() {
-    msg_t msg;
+    MFS_Msg_t msg;
     msg.lib = SHUTDOWN;
     msg.returnNum = 0;
     int rc;
-    rc = UDP_Write(fd, &addr, (char *)&msg, sizeof(msg_t));
+    rc = UDP_Write(fd, &addr, (char *)&msg, sizeof(MFS_Msg_t));
     if(rc > 0) {
         struct sockaddr_in retaddr;
-        rc = UDP_Read(fd, &retaddr, (char *)&msg, sizeof(msg_t));
+        rc = UDP_Read(fd, &retaddr, (char *)&msg, sizeof(MFS_Msg_t));
     }
     return 0;
 }
