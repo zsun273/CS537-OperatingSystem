@@ -213,7 +213,7 @@ int server_write(int inum, char *buff, int blk) {
         write(fd, buff, BUFFER_SIZE);
     }
     else {                         // block is not empty, overwrite
-        //inode.stat.size = (blk + 1) * 4096; // TODO: do we need this?
+        inode.stat.size = (blk + 1) * 4096;
         lseek(fd, inode_locs.inodeArr[inum], SEEK_SET);
         write(fd, &inode, sizeof(inode_t));
         lseek(fd, inode.blockArr[blk], SEEK_SET);
