@@ -7,6 +7,29 @@ int fd;
 struct timeval timeCheck;
 fd_set rfds;
 
+msg_t communicate(struct msg_t* msg){
+    int valReturn = 0;
+    int rc;
+    //wait until one gets a returned value
+    while(valReturn == 0) {
+        rc = UDP_Write(fd, &addr, (char *) msg, sizeof(msg_t));
+        FD_ZERO(&rfds);
+        FD_SET(fd, &rfds);
+        //wait for 5 seconds
+        timeCheck.tv_sec = 5;
+        timeCheck.tv_usec = 0;
+        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeCheck);
+        if(valReturn) {
+            if(rc > 0) {
+                struct sockaddr_in retaddr;
+                //grab back return val from server
+                rc = UDP_Read(fd, &retaddr, (char*) msg, sizeof(msg_t));
+            }
+        }
+    }
+    return *msg;
+}
+
 int MFS_Init(char *hostname, int port) {
     fd = UDP_Open(0);
     assert(fd > -1);
@@ -16,8 +39,6 @@ int MFS_Init(char *hostname, int port) {
 }
 
 int MFS_Lookup(int pinum, char *name) {
-    int valReturn;
-
     //initialize message
     msg_t msg;
     msg.block = -1;
@@ -30,37 +51,34 @@ int MFS_Lookup(int pinum, char *name) {
     memcpy(msg.name, name, sizeof(msg.name));
     sprintf(msg.buffer, "Default");
 
-
-    valReturn = 0;
-    int rc;
-
-    //wait until one gets a returned value
-    while(valReturn == 0) {
-        rc = UDP_Write(fd, &addr, (char *) &msg, sizeof(msg_t));
-
-        FD_ZERO(&rfds);
-        FD_SET(fd, &rfds);
-
-        //wait for 5 seconds
-        timeCheck.tv_sec = 5;
-        timeCheck.tv_usec = 0;
-
-        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeCheck);
-        if(valReturn) {
-            if(rc > 0) {
-                struct sockaddr_in retaddr;
-                //grab back return val from server
-                rc = UDP_Read(fd, &retaddr, (char*) &msg, sizeof(msg_t));
-            }
-        }
-    }
+//    int valReturn = 0;
+//    int rc;
+//    //wait until one gets a returned value
+//    while(valReturn == 0) {
+//        rc = UDP_Write(fd, &addr, (char *) &msg, sizeof(msg_t));
+//
+//        FD_ZERO(&rfds);
+//        FD_SET(fd, &rfds);
+//
+//        //wait for 5 seconds
+//        timeCheck.tv_sec = 5;
+//        timeCheck.tv_usec = 0;
+//
+//        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeCheck);
+//        if(valReturn) {
+//            if(rc > 0) {
+//                struct sockaddr_in retaddr;
+//                //grab back return val from server
+//                rc = UDP_Read(fd, &retaddr, (char*) &msg, sizeof(msg_t));
+//            }
+//        }
+//    }
+    msg = communicate(&msg);
     return msg.returnNum;
 }
 
 
 int MFS_Stat(int inum, MFS_Stat_t *m) {
-    int valReturn;
-
     msg_t msg;
     msg.inum = inum;
     msg.block = -1;
@@ -70,8 +88,7 @@ int MFS_Stat(int inum, MFS_Stat_t *m) {
     msg.returnNum = -1;
 
     int rc;
-    valReturn = 0;
-
+    int valReturn = 0;
     //wait for 5 sec and write values in
     while(valReturn == 0) {
         rc = UDP_Write(fd, &addr, (char *) &msg, sizeof(msg_t));
@@ -97,15 +114,14 @@ int MFS_Stat(int inum, MFS_Stat_t *m) {
 }
 
 int MFS_Write(int inum, char *buffer, int block) {
-    int valReturn;
     msg_t msg;
     msg.lib = WRITE;
     msg.inum = inum;
     msg.block = block;
     memcpy(msg.buffer, buffer, 4096);
-    int rc;
 
-    valReturn = 0;
+    int rc;
+    int valReturn = 0;
     while(valReturn == 0) {
         rc = UDP_Write(fd, &addr, (char*)&msg, sizeof(msg_t));
         FD_ZERO(&rfds);
@@ -122,12 +138,10 @@ int MFS_Write(int inum, char *buffer, int block) {
         }
 
     }
-
     return msg.returnNum;
 }
 
 int MFS_Read(int inum, char *buffer, int block) {
-    int valReturn;
     msg_t msg;
 
     msg.inum = inum;
@@ -139,8 +153,7 @@ int MFS_Read(int inum, char *buffer, int block) {
     msg.returnNum = -1;
 
     int rc;
-
-    valReturn = 0;
+    int valReturn = 0;
     while(valReturn == 0) {
         rc = UDP_Write(fd, &addr, (char*)&msg, sizeof(msg_t));
         FD_ZERO(&rfds);
@@ -163,7 +176,6 @@ int MFS_Read(int inum, char *buffer, int block) {
 }
 
 int MFS_Creat(int pinum, int type, char *name) {
-    int valReturn;
     msg_t msg;
 
     memcpy(msg.name, name, sizeof(msg.name));
@@ -175,8 +187,7 @@ int MFS_Creat(int pinum, int type, char *name) {
     msg.returnNum = -1;
 
     int rc;
-
-    valReturn = 0;
+    int valReturn = 0;
     while(valReturn == 0) {
         rc = UDP_Write(fd, &addr, (char*)&msg, sizeof(msg_t));
         FD_ZERO(&rfds);
@@ -184,7 +195,6 @@ int MFS_Creat(int pinum, int type, char *name) {
         timeCheck.tv_sec = 5;
         timeCheck.tv_usec = 0;
         valReturn = select(fd + 1, &rfds, NULL, NULL, &timeCheck);
-
         if(valReturn) {
             if(rc > 0) {
                 struct sockaddr_in retaddr;
@@ -196,7 +206,6 @@ int MFS_Creat(int pinum, int type, char *name) {
 }
 
 int MFS_Unlink(int pinum, char *name) {
-    int valReturn;
     msg_t msg;
 
     memcpy(msg.name, name, sizeof(msg.name));
@@ -208,8 +217,7 @@ int MFS_Unlink(int pinum, char *name) {
     msg.returnNum = -1;
 
     int rc;
-
-    valReturn = 0;
+    int valReturn = 0;
     while(valReturn == 0) {
         rc = UDP_Write(fd, &addr, (char*)&msg, sizeof(msg_t));
         FD_ZERO(&rfds);
@@ -217,7 +225,6 @@ int MFS_Unlink(int pinum, char *name) {
         timeCheck.tv_sec = 5;
         timeCheck.tv_usec = 0;
         valReturn = select(fd + 1, &rfds, NULL, NULL, &timeCheck);
-
         if(valReturn) {
             if(rc > 0) {
                 struct sockaddr_in retaddr;
