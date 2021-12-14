@@ -8,7 +8,7 @@ char buffer[4096];
 struct sockaddr_in addr;
 int fd;
 int port_number;
-struct timeval timeCheck;
+struct timeval timeval;
 fd_set rfds;
 
 int MFS_Init(char *hostname, int port) {
@@ -47,10 +47,10 @@ int MFS_Lookup(int pinum, char *name) {
         FD_SET(fd, &rfds);
 
         //wait for 5 seconds
-        timeCheck.tv_sec = 5;
-        timeCheck.tv_usec = 0;
+        timeval.tv_sec = 5;
+        timeval.tv_usec = 0;
 
-        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeCheck);
+        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeval);
 
 
         if(valReturn) {
@@ -87,9 +87,9 @@ int MFS_Stat(int inum, MFS_Stat_t *m) {
         FD_ZERO(&rfds);
         FD_SET(fd, &rfds);
 
-        timeCheck.tv_sec = 5;
-        timeCheck.tv_usec = 0;
-        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeCheck);
+        timeval.tv_sec = 5;
+        timeval.tv_usec = 0;
+        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeval);
 
         if(valReturn) {
             if(rc > 0) {
@@ -125,9 +125,9 @@ int MFS_Write(int inum, char *buffer, int block) {
         rc = UDP_Write(fd, &addr, (char*)&msg, sizeof(MFS_Msg_t));
         FD_ZERO(&rfds);
         FD_SET(fd, &rfds);
-        timeCheck.tv_sec = 5;
-        timeCheck.tv_usec = 0;
-        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeCheck);
+        timeval.tv_sec = 5;
+        timeval.tv_usec = 0;
+        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeval);
 
         if(valReturn) {
             if(rc > 0) {
@@ -160,9 +160,9 @@ int MFS_Read(int inum, char *buffer, int block) {
         rc = UDP_Write(fd, &addr, (char*)&msg, sizeof(MFS_Msg_t));
         FD_ZERO(&rfds);
         FD_SET(fd, &rfds);
-        timeCheck.tv_sec = 5;
-        timeCheck.tv_usec = 0;
-        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeCheck);
+        timeval.tv_sec = 5;
+        timeval.tv_usec = 0;
+        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeval);
 
         if(valReturn) {
             if(rc > 0) {
@@ -197,9 +197,9 @@ int MFS_Creat(int pinum, int type, char *name) {
         rc = UDP_Write(fd, &addr, (char*)&msg, sizeof(MFS_Msg_t));
         FD_ZERO(&rfds);
         FD_SET(fd, &rfds);
-        timeCheck.tv_sec = 5;
-        timeCheck.tv_usec = 0;
-        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeCheck);
+        timeval.tv_sec = 5;
+        timeval.tv_usec = 0;
+        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeval);
 
         if(valReturn) {
             if(rc > 0) {
@@ -231,9 +231,9 @@ int MFS_Unlink(int pinum, char *name) {
         rc = UDP_Write(fd, &addr, (char*)&msg, sizeof(MFS_Msg_t));
         FD_ZERO(&rfds);
         FD_SET(fd, &rfds);
-        timeCheck.tv_sec = 5;
-        timeCheck.tv_usec = 0;
-        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeCheck);
+        timeval.tv_sec = 5;
+        timeval.tv_usec = 0;
+        valReturn = select(fd + 1, &rfds, NULL, NULL, &timeval);
 
         if(valReturn) {
             if(rc > 0) {
