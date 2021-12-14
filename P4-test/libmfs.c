@@ -53,23 +53,23 @@ int MFS_Lookup(int pinum, char *name) {
     int valReturn = 0;
     int rc;
     //wait until one gets a returned value
-//    while(valReturn == 0) {
-//        rc = UDP_Write(sd, &addr, (char *) &msg, sizeof(msg_t));
-//        FD_ZERO(&rfds);
-//        FD_SET(sd, &rfds);
-//        //wait for 5 seconds
-//        timeCheck.tv_sec = 5;
-//        timeCheck.tv_usec = 0;
-//        valReturn = select(sd + 1, &rfds, NULL, NULL, &timeCheck);
-//        if(valReturn) {
-//            if(rc > 0) {
-//                struct sockaddr_in retaddr;
-//                //grab back return val from server
-//                rc = UDP_Read(sd, &retaddr, (char*) &msg, sizeof(msg_t));
-//            }
-//        }
-//    }
-    communicate(&msg);
+    while(valReturn == 0) {
+        rc = UDP_Write(sd, &addr, (char *) &msg, sizeof(msg_t));
+        FD_ZERO(&rfds);
+        FD_SET(sd, &rfds);
+        //wait for 5 seconds
+        timeCheck.tv_sec = 5;
+        timeCheck.tv_usec = 0;
+        valReturn = select(sd + 1, &rfds, NULL, NULL, &timeCheck);
+        if(valReturn) {
+            if(rc > 0) {
+                struct sockaddr_in retaddr;
+                //grab back return val from server
+                rc = UDP_Read(sd, &retaddr, (char*) &msg, sizeof(msg_t));
+            }
+        }
+    }
+    //communicate(&msg);
     return msg.returnNum;
 }
 
@@ -148,25 +148,25 @@ int MFS_Read(int inum, char *buffer, int block) {
     msg.pinum = -1;
     msg.returnNum = -1;
 
-//    int valReturn = 0;
-//    int rc;
-//    while(valReturn == 0) {
-//        rc = UDP_Write(sd, &addr, (char*)&msg, sizeof(msg_t));
-//        FD_ZERO(&rfds);
-//        FD_SET(sd, &rfds);
-//        timeCheck.tv_sec = 5;
-//        timeCheck.tv_usec = 0;
-//        valReturn = select(sd + 1, &rfds, NULL, NULL, &timeCheck);
-//
-//        if(valReturn) {
-//            if(rc > 0) {
-//                struct sockaddr_in retaddr;
-//                rc = UDP_Read(sd, &retaddr, (char *)&msg, sizeof(msg_t));
-//            }
-//        }
-//
-//    }
-    communicate(&msg);
+    int valReturn = 0;
+    int rc;
+    while(valReturn == 0) {
+        rc = UDP_Write(sd, &addr, (char*)&msg, sizeof(msg_t));
+        FD_ZERO(&rfds);
+        FD_SET(sd, &rfds);
+        timeCheck.tv_sec = 5;
+        timeCheck.tv_usec = 0;
+        valReturn = select(sd + 1, &rfds, NULL, NULL, &timeCheck);
+
+        if(valReturn) {
+            if(rc > 0) {
+                struct sockaddr_in retaddr;
+                rc = UDP_Read(sd, &retaddr, (char *)&msg, sizeof(msg_t));
+            }
+        }
+
+    }
+    //communicate(&msg);
 
     memcpy(buffer, msg.buffer, 4096);
     return msg.returnNum;
