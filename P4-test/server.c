@@ -4,24 +4,24 @@
 
 #define BUFFER_SIZE (4096)
 
-int initImage(char *imgName);
-int loadMem();
-int sRead(int inum, char *buff, int block);
-int sWrite(int inum, char *buff, int block);
-int sUnlink(int pinum, char *name);
-int sStat(int inum, MFS_Stat_t *m);
-int sLookup(int pinum, char *name);
-int sCreate(int pinum, int type, char *name);
-int cInode(int pinum, int type);
-int delInode(int inum);
+int init_image(char *imgName);
+int load_inode_loc();
+int server_read(int inum, char *buff, int block);
+int server_write(int inum, char *buff, int block);
+int server_unlink(int pinum, char *name);
+int server_stat(int inum, MFS_Stat_t *m);
+int server_lookup(int pinum, char *name);
+int server_create(int pinum, int type, char *name);
+int create_inode_imap(int pinum, int type);
+int del_inode_imap(int inum);
 void set_return_number(char * buffer);
-int shutDown();
+int server_shutDown();
 
 int sd;
 struct sockaddr_in s;
 char name[256];
 int fdDisk;
-checkpoint_t chkpt;
+checkpoint_t CR;
 inodeArr_t iArr;
 
 int main(int argc, char *argv[]) {
@@ -29,14 +29,13 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Usage: server <port> <file image>\n");
         exit(0);
     }
-    int portNum = atoi(argv[1]);
-
-    sd = UDP_Open(portNum); // use a port number to open
+    int port = atoi(argv[1]);
+    sd = UDP_Open(port); // use a port number to open
     assert(sd > -1);
 
     //init the server image
-    initImage(argv[2]);
-    loadMem();
+    init_image(argv[2]);
+    load_inode_loc();
 
     while (1) {
         char buffer[sizeof(MFS_Msg_t)];
@@ -49,7 +48,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-int initImage(char *imgName) {
+int init_image(char *imgName) {
     fdDisk = open(imgName, O_RDWR); // open an existing file with r/w access
 
     if(fdDisk < 0) {                // file not exist, create and initialize
@@ -57,10 +56,10 @@ int initImage(char *imgName) {
 
         // initialize the checkpoint region
         for(int i = 0; i < 256; i++) {
-            chkpt.imap[i] = -1;
+            CR.imap[i] = -1;
         }
-        chkpt.imap[0] = sizeof(checkpoint_t); // imap starts right after checkpoint region
-        chkpt.endLog = sizeof(checkpoint_t) + sizeof(imap_t) + sizeof(inode_t) + sizeof(dir_t);
+        CR.imap[0] = sizeof(checkpoint_t); // imap starts right after checkpoint region
+        CR.endLog = sizeof(checkpoint_t) + sizeof(imap_t) + sizeof(inode_t) + sizeof(dir_t);
 
         //initialize the inode map
         imap_t imap;
@@ -92,33 +91,33 @@ int initImage(char *imgName) {
         sprintf(rootDir.dirArr[1].name, "..");
 
         lseek(fdDisk, 0, SEEK_SET);
-        write(fdDisk, &chkpt, sizeof(checkpoint_t));
+        write(fdDisk, &CR, sizeof(checkpoint_t));
         write(fdDisk, &imap, sizeof(imap));
         write(fdDisk, &root, sizeof(inode_t));
         write(fdDisk, &rootDir, sizeof(dir_t));
     }
     else { //file exist, read in existing checkpoint region
-        read(fdDisk, &chkpt, sizeof(checkpoint_t));
+        read(fdDisk, &CR, sizeof(checkpoint_t));
     }
 
     for(int i = 0; i < 4096; i++) {
         iArr.inodeArr[i] = -1;
     }
-    loadMem();
+    load_inode_loc();
 
     return 0;
 }
 
-int loadMem() {
+int load_inode_loc() {
     lseek(fdDisk, 0, SEEK_SET);
-    read(fdDisk, &chkpt, sizeof(checkpoint_t));
+    read(fdDisk, &CR, sizeof(checkpoint_t));
 
     //store all inode info
     int k = 0;
     imap_t imapTemp;
     for(int i = 0; i < 256; i++) {
-        if(chkpt.imap[i] >= 0) {
-            lseek(fdDisk, chkpt.imap[i], 0);
+        if(CR.imap[i] >= 0) {
+            lseek(fdDisk, CR.imap[i], 0);
             read(fdDisk, &imapTemp, sizeof(imap_t));
             for(int j = 0; j < 16; j++) {
                 if(imapTemp.inodeArr[j] >= 0) {
@@ -131,11 +130,11 @@ int loadMem() {
     return 0;
 }
 
-int sRead(int inum, char *buff, int blk) {
+int server_read(int inum, char *buff, int blk) {
     if(inum >= 4096 || inum < 0) return -1;
     if(blk > 13 || blk < 0) return -1;
 
-    loadMem();
+    load_inode_loc();
 
     if(iArr.inodeArr[inum] == -1) return -1;
 
@@ -151,11 +150,11 @@ int sRead(int inum, char *buff, int blk) {
     return 0;
 }
 
-int sWrite(int inum, char *buff, int blk) {
+int server_write(int inum, char *buff, int blk) {
     if(inum >= 4096 || inum < 0) return -1;
     if(blk > 13 || blk < 0) return -1;
 
-    loadMem();
+    load_inode_loc();
 
     if(iArr.inodeArr[inum] == -1) return -1;
 
@@ -167,11 +166,11 @@ int sWrite(int inum, char *buff, int blk) {
     if(inode.stat.type != 1) return -1;
 
     if(inode.blockArr[blk] == -1) {
-        int endLogTmp = chkpt.endLog;
-        chkpt.endLog += BUFFER_SIZE;
+        int endLogTmp = CR.endLog;
+        CR.endLog += BUFFER_SIZE;
 
         lseek(fdDisk, 0, SEEK_SET);
-        write(fdDisk, &chkpt, sizeof(checkpoint_t));
+        write(fdDisk, &CR, sizeof(checkpoint_t));
 
         inode.blockArr[blk] = endLogTmp;
         inode.stat.size =  (blk + 1) * 4096;
@@ -187,11 +186,11 @@ int sWrite(int inum, char *buff, int blk) {
         lseek(fdDisk, inode.blockArr[blk], SEEK_SET);
         write(fdDisk, buff, BUFFER_SIZE);
     }
-    loadMem();
+    load_inode_loc();
     return 0;
 }
 
-int sUnlink(int pinum, char *name) {
+int server_unlink(int pinum, char *name) {
     if(pinum < 0 || pinum > 4096) return -1;
     if(iArr.inodeArr[pinum] == -1) return -1;
     //test to see if name is equivalent to parent or current directory
@@ -235,7 +234,7 @@ int sUnlink(int pinum, char *name) {
         return -1; // this is not an empty directory
     }
 
-    delInode(delInodeLoc);
+    del_inode_imap(delInodeLoc);
 
     dirBlk.dirArr[delInd].inum = -1;
     sprintf(dirBlk.dirArr[delInd].name, "x");
@@ -253,14 +252,14 @@ int sUnlink(int pinum, char *name) {
     lseek(fdDisk, iArr.inodeArr[pinum], SEEK_SET);
     write(fdDisk, &pInode, sizeof(inode_t));
 
-    loadMem();
+    load_inode_loc();
     return 0;
 }
 
-int sStat(int inum, MFS_Stat_t *m) {
+int server_stat(int inum, MFS_Stat_t *m) {
     if(inum < 0 || inum >= 4096 ) return -1;
     if (fdDisk < 0) return -1;
-    loadMem();
+    load_inode_loc();
 
     if(iArr.inodeArr[inum] == -1) return -1;
 
@@ -274,10 +273,10 @@ int sStat(int inum, MFS_Stat_t *m) {
     return 0;
 }
 
-int sLookup(int pinum, char *name) {
+int server_lookup(int pinum, char *name) {
     if(pinum < 0 || pinum >= 4096) return -1;
     if(strlen(name) < 1 || strlen(name) > 28) return -1;
-    loadMem();
+    load_inode_loc();
     //check if parent inode number  is valid
     if(iArr.inodeArr[pinum] == -1) return -1;
 
@@ -303,12 +302,12 @@ int sLookup(int pinum, char *name) {
     return -1;
 }
 
-int sCreate(int pinum, int type, char *name) {
+int server_create(int pinum, int type, char *name) {
     if(pinum < 0 || pinum > 4096) return -1;
     if(type != MFS_DIRECTORY && type != MFS_REGULAR_FILE) return -1;
     if(strlen(name) < 1 || strlen(name) >= 28) return -1;
     if(iArr.inodeArr[pinum] == -1) return -1;
-    if(sLookup(pinum, name) >= 0) return 0; // name exist, return success
+    if(server_lookup(pinum, name) >= 0) return 0; // name exist, return success
 
     //get pinum location
     inode_t pInode;
@@ -318,7 +317,7 @@ int sCreate(int pinum, int type, char *name) {
     if(pInode.stat.type != MFS_DIRECTORY) return -1;
     if(pInode.stat.size >= (BUFFER_SIZE * 14 * 128)) return -1;
 
-    int newInum = cInode(pinum, type); // create a new inode and new imap and return inode number
+    int newInum = create_inode_imap(pinum, type); // create a new inode and new imap and return inode number
     int iDirBlkInd = pInode.stat.size / (BUFFER_SIZE * 128);
     if(iDirBlkInd > 14) return -1;
 
@@ -328,19 +327,19 @@ int sCreate(int pinum, int type, char *name) {
 
     // if full, add new block for directory
     if(dirBlkInd == 0) {
-        pInode.blockArr[iDirBlkInd] = chkpt.endLog;
+        pInode.blockArr[iDirBlkInd] = CR.endLog;
         dir_t newDirBlk;
         for(int i = 0; i < 128; i++) {
             sprintf(newDirBlk.dirArr[i].name, "x");
             newDirBlk.dirArr[i].inum = -1;
         }
 
-        lseek(fdDisk, chkpt.endLog, SEEK_SET);
+        lseek(fdDisk, CR.endLog, SEEK_SET);
         write(fdDisk, &newDirBlk, sizeof(dir_t));
         // update checkpoint region
-        chkpt.endLog += BUFFER_SIZE;
+        CR.endLog += BUFFER_SIZE;
         lseek(fdDisk, 0, SEEK_SET);
-        write(fdDisk, &chkpt, sizeof(checkpoint_t));
+        write(fdDisk, &CR, sizeof(checkpoint_t));
     }
 
     lseek(fdDisk, iArr.inodeArr[pinum], SEEK_SET);
@@ -358,16 +357,16 @@ int sCreate(int pinum, int type, char *name) {
     lseek(fdDisk, pInode.blockArr[iDirBlkInd], 0);
     write(fdDisk, &dirBlk, sizeof(dir_t));
 
-    loadMem();
+    load_inode_loc();
     return 0;
 }
 
-int delInode(int inum) {
+int del_inode_imap(int inum) {
     int imapInd = inum / 16;
     int imapInIndex = inum % 16;
 
     imap_t imapTmp;
-    lseek(fdDisk, chkpt.imap[imapInd], SEEK_SET);
+    lseek(fdDisk, CR.imap[imapInd], SEEK_SET);
     read(fdDisk, &imapTmp, sizeof(imap_t));
 
     imapTmp.inodeArr[imapInIndex] = -1;
@@ -378,19 +377,19 @@ int delInode(int inum) {
         }
     }
     if(empty == 0) { // this imap is empty, all -1, delete the imap
-        chkpt.imap[imapInd] = -1;
+        CR.imap[imapInd] = -1;
         lseek(fdDisk, 0, SEEK_SET);
-        write(fdDisk, &chkpt, sizeof(checkpoint_t));
+        write(fdDisk, &CR, sizeof(checkpoint_t));
     }
     else {
-        lseek(fdDisk, chkpt.imap[imapInd], SEEK_SET);
+        lseek(fdDisk, CR.imap[imapInd], SEEK_SET);
         write(fdDisk, &imapTmp, sizeof(imapTmp));
     }
     return 0;
 }
 
-int cInode(int pinum, int type) {
-    loadMem();
+int create_inode_imap(int pinum, int type) {
+    load_inode_loc();
     // find first empty inode
     int nInodeNum = -1;
     for(int i = 0; i < 4096; i++) {
@@ -407,32 +406,32 @@ int cInode(int pinum, int type) {
     if(nImapInd == 0) { // need to create a new imap
         int emptyMapNum = -1;
         for(int i = 0; i < 256; i++) {
-            if(chkpt.imap[i] == -1) {
+            if(CR.imap[i] == -1) {
                 emptyMapNum = i;
                 break;
             }
         }
         if (emptyMapNum == -1) return -1;
 
-        chkpt.imap[emptyMapNum] = chkpt.endLog;
+        CR.imap[emptyMapNum] = CR.endLog;
         imap_t nimap;
         for(int i = 0; i < 16; i++) {
             nimap.inodeArr[i] = -1;
         }
 
-        chkpt.endLog += sizeof(imap_t);
+        CR.endLog += sizeof(imap_t);
         lseek(fdDisk, 0, SEEK_SET);
-        write(fdDisk, &chkpt, sizeof(checkpoint_t));
-        lseek(fdDisk, chkpt.imap[emptyMapNum], SEEK_SET);
+        write(fdDisk, &CR, sizeof(checkpoint_t));
+        lseek(fdDisk, CR.imap[emptyMapNum], SEEK_SET);
         write(fdDisk, &nimap, sizeof(imap_t));
     }
 
     imap_t imapTmp;
-    lseek(fdDisk, chkpt.imap[imapInd], SEEK_SET);
+    lseek(fdDisk, CR.imap[imapInd], SEEK_SET);
     read(fdDisk, &imapTmp, sizeof(imap_t));
 
-    imapTmp.inodeArr[nImapInd] = chkpt.endLog;
-    lseek(fdDisk, chkpt.imap[imapInd], SEEK_SET);
+    imapTmp.inodeArr[nImapInd] = CR.endLog;
+    lseek(fdDisk, CR.imap[imapInd], SEEK_SET);
     write(fdDisk, &imapTmp, sizeof(imap_t));
 
     inode_t nInode;
@@ -441,12 +440,12 @@ int cInode(int pinum, int type) {
         nInode.blockArr[i] = -1;
     }
 
-    nInode.blockArr[0] = chkpt.endLog + sizeof(inode_t);
+    nInode.blockArr[0] = CR.endLog + sizeof(inode_t);
     if(type == MFS_DIRECTORY) {
         nInode.stat.size = 2 * BUFFER_SIZE;
-        lseek(fdDisk, chkpt.endLog, SEEK_SET);
+        lseek(fdDisk, CR.endLog, SEEK_SET);
         write(fdDisk, &nInode, sizeof(inode_t));
-        chkpt.endLog += sizeof(nInode);
+        CR.endLog += sizeof(nInode);
 
         dir_t dirBlk;
         for(int i = 0; i < 128; i++) {
@@ -460,24 +459,24 @@ int cInode(int pinum, int type) {
         sprintf(dirBlk.dirArr[1].name, "..");
 
         write(fdDisk, &dirBlk, sizeof(dir_t));
-        chkpt.endLog += sizeof(dir_t);
+        CR.endLog += sizeof(dir_t);
 
     } else {
         nInode.stat.size = 0;
-        lseek(fdDisk, chkpt.endLog, SEEK_SET);
+        lseek(fdDisk, CR.endLog, SEEK_SET);
         write(fdDisk, &nInode, sizeof(inode_t));
-        chkpt.endLog += sizeof(nInode);
+        CR.endLog += sizeof(nInode);
 
         char *nBlk = malloc(BUFFER_SIZE);
         write(fdDisk, nBlk, BUFFER_SIZE);
         free(nBlk);
-        chkpt.endLog += BUFFER_SIZE;
+        CR.endLog += BUFFER_SIZE;
     }
 
     // updated checkpoint region
     lseek(fdDisk, 0, SEEK_SET);
-    write(fdDisk, &chkpt, sizeof(checkpoint_t));
-    loadMem();
+    write(fdDisk, &CR, sizeof(checkpoint_t));
+    load_inode_loc();
     return nInodeNum;
 }
 
@@ -487,25 +486,25 @@ void set_return_number(char * buffer) {
 
     switch(msg->lib) {
         case INIT:
-            msg->returnNum = initImage(name);
+            msg->returnNum = init_image(name);
             break;
         case LOOKUP:
-            msg->returnNum = sLookup(msg->pinum, msg->name);
+            msg->returnNum = server_lookup(msg->pinum, msg->name);
             break;
         case STAT:
-            msg->returnNum = sStat(msg->inum, &(msg->stat));
+            msg->returnNum = server_stat(msg->inum, &(msg->stat));
             break;
         case WRITE:
-            msg->returnNum = sWrite(msg->inum, msg->buffer, msg->block);
+            msg->returnNum = server_write(msg->inum, msg->buffer, msg->block);
             break;
         case READ:
-            msg->returnNum = sRead(msg->inum, msg->buffer, msg->block);
+            msg->returnNum = server_read(msg->inum, msg->buffer, msg->block);
             break;
         case CREAT:
-            msg->returnNum = sCreate(msg->pinum, msg->type, msg->name);
+            msg->returnNum = server_create(msg->pinum, msg->type, msg->name);
             break;
         case UNLINK:
-            msg->returnNum = sUnlink(msg->pinum, msg->name);
+            msg->returnNum = server_unlink(msg->pinum, msg->name);
             break;
         case SHUTDOWN:
             msg->returnNum = 0;
@@ -518,7 +517,7 @@ void set_return_number(char * buffer) {
     memcpy(buffer, msg, sizeof(*msg));
 }
 
-int shutDown() {
+int server_shutDown() {
     close(fdDisk);
     exit(0);
     return 0;
