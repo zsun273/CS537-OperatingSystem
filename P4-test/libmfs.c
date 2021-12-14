@@ -101,7 +101,7 @@ int MFS_Read(int inum, char *buffer, int block) {
 int MFS_Creat(int pinum, int type, char *name) {
     MFS_Msg_t msg;
     memcpy(msg.name, name, sizeof(msg.name));
-    msg.type = type;
+    msg.stat.type = type;
     msg.pinum = pinum;
     msg.lib = CREAT;
     msg.returnNum = -1;

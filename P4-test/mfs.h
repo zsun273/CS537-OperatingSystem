@@ -65,7 +65,6 @@ typedef struct __MFS_Msg_t {
     int inum;
     int pinum;
     int block;
-    int type;
     int returnNum;
     MFS_Stat_t stat;
     lib_t lib;
