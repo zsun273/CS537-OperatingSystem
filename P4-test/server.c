@@ -68,7 +68,7 @@ void set_return_number(char * buffer) {
             msg->returnNum = server_read(msg->inum, msg->buffer, msg->block);
             break;
         case CREAT:
-            msg->returnNum = server_create(msg->pinum, msg->stat->type, msg->name);
+            msg->returnNum = server_create(msg->pinum, msg->stat.type, msg->name);
             break;
         case UNLINK:
             msg->returnNum = server_unlink(msg->pinum, msg->name);
