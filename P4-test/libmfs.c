@@ -51,7 +51,6 @@ int MFS_Lookup(int pinum, char *name) {
 int MFS_Stat(int inum, MFS_Stat_t *m) {
     MFS_Msg_t msg;
     msg.inum = inum;
-    msg.block = -1;
     msg.lib = STAT;
     msg.returnNum = -1;
     msg = communicate(&msg);

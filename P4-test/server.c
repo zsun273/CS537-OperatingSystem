@@ -15,7 +15,6 @@ int server_stat(int inum, MFS_Stat_t *m);
 int server_lookup(int pinum, char *name);
 int server_create(int pinum, int type, char *name);
 int create_inode_imap(int pinum, int type);
-//int server_shutDown();
 
 struct sockaddr_in s;
 int sd;                 // global socket descriptor
@@ -213,8 +212,8 @@ int server_write(int inum, char *buff, int blk) {
         lseek(fd, end_log, SEEK_SET);
         write(fd, buff, BUFFER_SIZE);
     }
-    else {
-        inode.stat.size = (blk + 1) * 4096; // TODO: do we need this?
+    else {                         // block is not empty, overwrite
+        //inode.stat.size = (blk + 1) * 4096; // TODO: do we need this?
         lseek(fd, inode_locs.inodeArr[inum], SEEK_SET);
         write(fd, &inode, sizeof(inode_t));
         lseek(fd, inode.blockArr[blk], SEEK_SET);
@@ -231,11 +230,13 @@ int server_unlink(int pinum, char *name) {
     if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0) return -1;
     if(strlen(name) > 28 || strlen(name) < 0) return -1;
 
+    // read in the parent inode
     inode_t parent_inode;
     lseek(fd, inode_locs.inodeArr[pinum], SEEK_SET);
     read(fd, &parent_inode, sizeof(inode_t));
     if(parent_inode.stat.type != MFS_DIRECTORY) return -1;
 
+    // find all the locations to do delete
     int found = 0;
     int dir_blk_loc, idx_dir_arr, inode_loc;
     dir_t dir_blk;
@@ -263,7 +264,7 @@ int server_unlink(int pinum, char *name) {
     read(fd, &inode_del, sizeof(inode_del));
 
     if(inode_del.stat.type == MFS_DIRECTORY && inode_del.stat.size > 2 * BUFFER_SIZE) {
-        return -1; // this is not an empty directory
+        return -1; // this is not an empty directory, delete fail
     }
 
     del_inode_imap(inode_loc);
@@ -279,7 +280,7 @@ int server_unlink(int pinum, char *name) {
             last_blk = i;
         }
     }
-    //update parent directory's size
+    //update parent directory
     parent_inode.stat.size = (last_blk + 1) * BUFFER_SIZE;
     lseek(fd, inode_locs.inodeArr[pinum], SEEK_SET);
     write(fd, &parent_inode, sizeof(inode_t));
@@ -322,6 +323,7 @@ int server_stat(int inum, MFS_Stat_t *m) {
 
     if(inode_locs.inodeArr[inum] == -1) return -1;
 
+    // read in the inode
     inode_t inode;
     lseek(fd, inode_locs.inodeArr[inum], 0);
     read(fd, &inode, sizeof(inode_t));
@@ -335,10 +337,9 @@ int server_lookup(int pinum, char *name) {
     if(pinum < 0 || pinum >= 4096) return -1;
     if(strlen(name) < 1 || strlen(name) > 28) return -1;
     load_inode_loc();
-    //check if parent inode number  is valid
     if(inode_locs.inodeArr[pinum] == -1) return -1;
 
-    //read the parent inode
+    //read in the parent inode
     inode_t parent_inode;
     lseek(fd, inode_locs.inodeArr[pinum], SEEK_SET);
     read(fd, &parent_inode, sizeof(parent_inode));
@@ -349,7 +350,7 @@ int server_lookup(int pinum, char *name) {
         dir_t dir_blk;
         read(fd, &dir_blk, sizeof(dir_t));
         for(int j = 0; j < 128; j++) {
-            // find the matched name and return
+            // find the matched name and return its inode number
             if(strcmp(dir_blk.dirArr[j].name, name) == 0) {
                 return dir_blk.dirArr[j].inum;
             }
@@ -365,7 +366,7 @@ int server_create(int pinum, int type, char *name) {
     if(inode_locs.inodeArr[pinum] == -1) return -1;
     if(server_lookup(pinum, name) >= 0) return 0; // name exist, return success
 
-    //get pinum location
+    //read in the parent inode
     inode_t parent_inode;
     lseek(fd, inode_locs.inodeArr[pinum], SEEK_SET);
     read(fd, &parent_inode, sizeof(inode_t));
@@ -381,7 +382,7 @@ int server_create(int pinum, int type, char *name) {
 
     parent_inode.stat.size += BUFFER_SIZE;
 
-    // if full, add new block for directory
+    // if full, add new block to the directory
     if(idx_in_dir_blk == 0) {
         parent_inode.blockArr[idx_of_dir_blk] = CR.endLog;
         dir_t new_dir_blk;
@@ -389,15 +390,13 @@ int server_create(int pinum, int type, char *name) {
             sprintf(new_dir_blk.dirArr[i].name, "x");
             new_dir_blk.dirArr[i].inum = -1;
         }
-
         lseek(fd, CR.endLog, SEEK_SET);
         write(fd, &new_dir_blk, sizeof(dir_t));
-        // update checkpoint region
         CR.endLog += BUFFER_SIZE;
         lseek(fd, 0, SEEK_SET);
         write(fd, &CR, sizeof(checkpoint_t));
     }
-
+    // update to disk
     lseek(fd, inode_locs.inodeArr[pinum], SEEK_SET);
     write(fd, &parent_inode, sizeof(parent_inode));
 
@@ -408,7 +407,6 @@ int server_create(int pinum, int type, char *name) {
     sprintf(dir_blk.dirArr[idx_in_dir_blk].name, name, 28);
     dir_blk.dirArr[idx_in_dir_blk].inum = new_inum;
 
-    //write to updated directory
     lseek(fd, parent_inode.blockArr[idx_of_dir_blk], 0);
     write(fd, &dir_blk, sizeof(dir_t));
 
@@ -487,27 +485,20 @@ int create_inode_imap(int pinum, int type) {
 
         write(fd, &dir_blk, sizeof(dir_t));
         CR.endLog += sizeof(dir_t);
-    } else {
+    } else { // type is regular file
         new_inode.stat.size = 0;
         lseek(fd, CR.endLog, SEEK_SET);
         write(fd, &new_inode, sizeof(inode_t));
         CR.endLog += sizeof(new_inode);
 
-        char *nBlk = malloc(BUFFER_SIZE);
-        write(fd, nBlk, BUFFER_SIZE);
-        free(nBlk);
+        char *new_blk = malloc(BUFFER_SIZE);
+        write(fd, new_blk, BUFFER_SIZE);
+        free(new_blk);
         CR.endLog += BUFFER_SIZE;
     }
 
-    // updated checkpoint region
     lseek(fd, 0, SEEK_SET);
     write(fd, &CR, sizeof(checkpoint_t));
     load_inode_loc();
     return first_empty_inum;
 }
-
-//int server_shutDown() {
-//    close(fd);
-//    exit(0);
-//    return 0;
-//}
