@@ -18,16 +18,16 @@ typedef struct __MFS_DirEnt_t {
 } MFS_DirEnt_t;
 
 // struct for the checkpoint region
-typedef struct checkpoint_t {
+typedef struct __MFS_CR_t {
     int imap[256];
-    int endLog; //end of the log
-} checkpoint_t;
+    int end;        //end of the log
+} MFS_CR_t;
 
 // struct for inode
-typedef struct inode_t {
+typedef struct __MFS_inode_t {
     MFS_Stat_t stat;
-    int blockArr[14];
-} inode_t;
+    int block_loc[14];
+} MFS_inode_t;
 
 // struct for inode map pieces
 // one inode map piece can point to 16 inodes
