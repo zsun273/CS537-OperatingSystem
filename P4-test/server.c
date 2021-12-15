@@ -524,6 +524,7 @@ int create_inode_imap(int pinum, int type) {
 }
 
 int check_inum(int inum){
+    fsync(fd);
     // read in CR
     lseek(fd, 0, SEEK_SET);
     read(fd, &CR, sizeof(MFS_CR_t));
