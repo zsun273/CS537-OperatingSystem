@@ -167,6 +167,7 @@ int load_inode_loc() {
 }
 
 int server_read(int inum, char *buff, int blk) {
+    fsync(fd);
     if(inum >= 4096 || inum < 0) return -1;
     if(blk > 13 || blk < 0) return -1;
 
@@ -224,6 +225,7 @@ int server_write(int inum, char *buff, int blk) {
 }
 
 int server_unlink(int pinum, char *name) {
+    fsync(fd);
     if(pinum < 0 || pinum > 4096) return -1;
 
     int inode_location = check_inum(pinum);
@@ -288,11 +290,12 @@ int server_unlink(int pinum, char *name) {
     parent_inode.stat.size = (last_blk + 1) * BUFFER_SIZE;
     lseek(fd, inode_location, SEEK_SET);
     write(fd, &parent_inode, sizeof(MFS_inode_t));
-
+    fsync(fd);
     return 0;
 }
 
 int del_inode_imap(int inum) {
+    fsync(fd);
     int idx_of_imap = inum / 16;
     int idx_in_imap = inum % 16;
 
@@ -316,6 +319,7 @@ int del_inode_imap(int inum) {
         lseek(fd, CR.imap[idx_of_imap], SEEK_SET);
         write(fd, &imap_copy, sizeof(imap_copy));
     }
+    fsync(fd);
     return 0;
 }
 
@@ -337,6 +341,7 @@ int server_stat(int inum, MFS_Stat_t *m) {
 }
 
 int server_lookup(int pinum, char *name) {
+    fsync(fd);
     if(pinum < 0 || pinum >= 4096) return -1;
     if(strlen(name) < 1 || strlen(name) > 28) return -1;
 
@@ -364,6 +369,7 @@ int server_lookup(int pinum, char *name) {
 }
 
 int server_create(int pinum, int type, char *name) {
+    fsync(fd);
     if(pinum < 0 || pinum > 4096) return -1;
     if(type != MFS_DIRECTORY && type != MFS_REGULAR_FILE) return -1;
     if(strlen(name) < 1 || strlen(name) >= 28) return -1;
@@ -416,11 +422,12 @@ int server_create(int pinum, int type, char *name) {
 
     lseek(fd, parent_inode.block_loc[idx_of_dir_blk], 0);
     write(fd, &dir_blk, sizeof(MFS_Dir_t));
-
+    fsync(fd);
     return 0;
 }
 
 int create_inode_imap(int pinum, int type) {
+    fsync(fd);
     // find first empty inode
     int first_empty_inum = -1;
 //    for(int i = 0; i < 4096; i++) {
@@ -520,6 +527,7 @@ int create_inode_imap(int pinum, int type) {
 
     lseek(fd, 0, SEEK_SET);
     write(fd, &CR, sizeof(MFS_CR_t));
+    fsync(fd);
     return first_empty_inum;
 }
 
