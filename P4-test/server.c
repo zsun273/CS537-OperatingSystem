@@ -94,14 +94,14 @@ int init_image(char *image) {
             CR.imap[i] = -1;
         }
         CR.imap[0] = sizeof(checkpoint_t); // imap starts right after checkpoint region
-        CR.endLog = sizeof(checkpoint_t) + sizeof(imap_t) + sizeof(inode_t) + sizeof(dir_t);
+        CR.endLog = sizeof(checkpoint_t) + sizeof(MFS_imap_t) + sizeof(inode_t) + sizeof(MFS_Dir_t);
 
         //initialize the inode map
-        imap_t imap;
+        MFS_imap_t imap;
         for(int i = 0; i < 16; i++) {
             imap.inode_loc[i] = -1;
         }
-        imap.inode_loc[0] = sizeof(checkpoint_t) + sizeof(imap_t); // first inode starts right after the imap
+        imap.inode_loc[0] = sizeof(checkpoint_t) + sizeof(MFS_imap_t); // first inode starts right after the imap
 
         //initialize inode for root directory
         inode_t root;
@@ -110,26 +110,26 @@ int init_image(char *image) {
         for(int i = 0; i < 14; i++) {
             root.blockArr[i] = -1;
         }
-        root.blockArr[0] = sizeof(checkpoint_t) + sizeof(imap_t) + sizeof(inode_t);
+        root.blockArr[0] = sizeof(checkpoint_t) + sizeof(MFS_imap_t) + sizeof(inode_t);
 
         //write first directory block
-        dir_t root_dir;
+        MFS_Dir_t root_dir;
         for(int i = 0; i < 128; i++) {
-            root_dir.dirArr[i].inum = -1;
-            sprintf(root_dir.dirArr[i].name, "x");
+            root_dir.dir_ent_loc[i].inum = -1;
+            sprintf(root_dir.dir_ent_loc[i].name, "x");
         }
 
         // initialize two directory entries
-        root_dir.dirArr[0].inum = 0;
-        sprintf(root_dir.dirArr[0].name, ".");
-        root_dir.dirArr[1].inum = 0;
-        sprintf(root_dir.dirArr[1].name, "..");
+        root_dir.dir_ent_loc[0].inum = 0;
+        sprintf(root_dir.dir_ent_loc[0].name, ".");
+        root_dir.dir_ent_loc[1].inum = 0;
+        sprintf(root_dir.dir_ent_loc[1].name, "..");
 
         lseek(fd, 0, SEEK_SET);
         write(fd, &CR, sizeof(checkpoint_t));
         write(fd, &imap, sizeof(imap));
         write(fd, &root, sizeof(inode_t));
-        write(fd, &root_dir, sizeof(dir_t));
+        write(fd, &root_dir, sizeof(MFS_Dir_t));
     }
     else { //file exist, read in existing checkpoint region
         read(fd, &CR, sizeof(checkpoint_t));
@@ -149,11 +149,11 @@ int load_inode_loc() {
 
     //store all inode start locations
     int idx = 0;
-    imap_t imap_copy;
+    MFS_imap_t imap_copy;
     for(int i = 0; i < 256; i++) {
         if(CR.imap[i] >= 0) {
             lseek(fd, CR.imap[i], SEEK_SET);
-            read(fd, &imap_copy, sizeof(imap_t));
+            read(fd, &imap_copy, sizeof(MFS_imap_t));
             for(int j = 0; j < 16; j++) {
                 if(imap_copy.inode_loc[j] >= 0) {
                     inode_locs.inode_loc[idx] = imap_copy.inode_loc[j];
@@ -239,16 +239,16 @@ int server_unlink(int pinum, char *name) {
     // find all the locations to do delete
     int found = 0;
     int dir_blk_loc, idx_dir_arr, inode_loc;
-    dir_t dir_blk;
+    MFS_Dir_t dir_blk;
     for(int i = 0; i < 14; i++) {
         if(parent_inode.blockArr[i] >= 0) {
             lseek(fd, parent_inode.blockArr[i], SEEK_SET);
-            read(fd, &dir_blk, sizeof(dir_t));
+            read(fd, &dir_blk, sizeof(MFS_Dir_t));
             for(int j = 0; j < 128; j++) {
-                if(strcmp(dir_blk.dirArr[j].name, name) == 0) {
+                if(strcmp(dir_blk.dir_ent_loc[j].name, name) == 0) {
                     found = 1;
                     idx_dir_arr = j;
-                    inode_loc = inode_locs.inode_loc[dir_blk.dirArr[j].inum];
+                    inode_loc = inode_locs.inode_loc[dir_blk.dir_ent_loc[j].inum];
                     dir_blk_loc = parent_inode.blockArr[i];
                     break;
                 }
@@ -269,10 +269,10 @@ int server_unlink(int pinum, char *name) {
 
     del_inode_imap(inode_loc);
 
-    dir_blk.dirArr[idx_dir_arr].inum = -1;
-    sprintf(dir_blk.dirArr[idx_dir_arr].name, "x");
+    dir_blk.dir_ent_loc[idx_dir_arr].inum = -1;
+    sprintf(dir_blk.dir_ent_loc[idx_dir_arr].name, "x");
     lseek(fd, dir_blk_loc, SEEK_SET);
-    write(fd, &dir_blk, sizeof(dir_t));
+    write(fd, &dir_blk, sizeof(MFS_Dir_t));
 
     int last_blk = -1;
     for(int i = 0; i < 14; i++) {
@@ -293,9 +293,9 @@ int del_inode_imap(int inum) {
     int idx_of_imap = inum / 16;
     int idx_in_imap = inum % 16;
 
-    imap_t imap_copy;
+    MFS_imap_t imap_copy;
     lseek(fd, CR.imap[idx_of_imap], SEEK_SET);
-    read(fd, &imap_copy, sizeof(imap_t));
+    read(fd, &imap_copy, sizeof(MFS_imap_t));
 
     imap_copy.inode_loc[idx_in_imap] = -1;
     int empty = 0;
@@ -347,12 +347,12 @@ int server_lookup(int pinum, char *name) {
 
     for(int i = 0; i < 14; i++) {
         lseek(fd, parent_inode.blockArr[i], SEEK_SET);
-        dir_t dir_blk;
-        read(fd, &dir_blk, sizeof(dir_t));
+        MFS_Dir_t dir_blk;
+        read(fd, &dir_blk, sizeof(MFS_Dir_t));
         for(int j = 0; j < 128; j++) {
             // find the matched name and return its inode number
-            if(strcmp(dir_blk.dirArr[j].name, name) == 0) {
-                return dir_blk.dirArr[j].inum;
+            if(strcmp(dir_blk.dir_ent_loc[j].name, name) == 0) {
+                return dir_blk.dir_ent_loc[j].inum;
             }
         }
     }
@@ -385,13 +385,13 @@ int server_create(int pinum, int type, char *name) {
     // if full, add new block to the directory
     if(idx_in_dir_blk == 0) {
         parent_inode.blockArr[idx_of_dir_blk] = CR.endLog;
-        dir_t new_dir_blk;
+        MFS_Dir_t new_dir_blk;
         for(int i = 0; i < 128; i++) {
-            sprintf(new_dir_blk.dirArr[i].name, "x");
-            new_dir_blk.dirArr[i].inum = -1;
+            sprintf(new_dir_blk.dir_ent_loc[i].name, "x");
+            new_dir_blk.dir_ent_loc[i].inum = -1;
         }
         lseek(fd, CR.endLog, SEEK_SET);
-        write(fd, &new_dir_blk, sizeof(dir_t));
+        write(fd, &new_dir_blk, sizeof(MFS_Dir_t));
         CR.endLog += BUFFER_SIZE;
         lseek(fd, 0, SEEK_SET);
         write(fd, &CR, sizeof(checkpoint_t));
@@ -401,14 +401,14 @@ int server_create(int pinum, int type, char *name) {
     write(fd, &parent_inode, sizeof(parent_inode));
 
     lseek(fd, parent_inode.blockArr[idx_of_dir_blk], SEEK_SET);
-    dir_t dir_blk;
-    read(fd, &dir_blk, sizeof(dir_t));
-    sprintf(dir_blk.dirArr[idx_in_dir_blk].name, "x");
-    sprintf(dir_blk.dirArr[idx_in_dir_blk].name, name, 28);
-    dir_blk.dirArr[idx_in_dir_blk].inum = new_inum;
+    MFS_Dir_t dir_blk;
+    read(fd, &dir_blk, sizeof(MFS_Dir_t));
+    sprintf(dir_blk.dir_ent_loc[idx_in_dir_blk].name, "x");
+    sprintf(dir_blk.dir_ent_loc[idx_in_dir_blk].name, name, 28);
+    dir_blk.dir_ent_loc[idx_in_dir_blk].inum = new_inum;
 
     lseek(fd, parent_inode.blockArr[idx_of_dir_blk], 0);
-    write(fd, &dir_blk, sizeof(dir_t));
+    write(fd, &dir_blk, sizeof(MFS_Dir_t));
 
     load_inode_loc();
     return 0;
@@ -440,23 +440,23 @@ int create_inode_imap(int pinum, int type) {
         if (first_empty_imap == -1) return -1;
 
         CR.imap[first_empty_imap] = CR.endLog;
-        imap_t new_imap;
+        MFS_imap_t new_imap;
         for(int i = 0; i < 16; i++) {
             new_imap.inode_loc[i] = -1;
         }
-        CR.endLog += sizeof(imap_t);
+        CR.endLog += sizeof(MFS_imap_t);
         lseek(fd, 0, SEEK_SET);
         write(fd, &CR, sizeof(checkpoint_t));
         lseek(fd, CR.imap[first_empty_imap], SEEK_SET);
-        write(fd, &new_imap, sizeof(imap_t));
+        write(fd, &new_imap, sizeof(MFS_imap_t));
     }
 
-    imap_t imap_copy;
+    MFS_imap_t imap_copy;
     lseek(fd, CR.imap[idx_of_imap], SEEK_SET);
-    read(fd, &imap_copy, sizeof(imap_t));
+    read(fd, &imap_copy, sizeof(MFS_imap_t));
     imap_copy.inode_loc[idx_in_imap] = CR.endLog;
     lseek(fd, CR.imap[idx_of_imap], SEEK_SET);
-    write(fd, &imap_copy, sizeof(imap_t));
+    write(fd, &imap_copy, sizeof(MFS_imap_t));
 
     inode_t new_inode;
     new_inode.stat.type = type;
@@ -471,19 +471,19 @@ int create_inode_imap(int pinum, int type) {
         write(fd, &new_inode, sizeof(inode_t));
         CR.endLog += sizeof(new_inode);
 
-        dir_t dir_blk;
+        MFS_Dir_t dir_blk;
         for(int i = 0; i < 128; i++) {
-            dir_blk.dirArr[i].inum = -1;
-            sprintf(dir_blk.dirArr[i].name, "x");
+            dir_blk.dir_ent_loc[i].inum = -1;
+            sprintf(dir_blk.dir_ent_loc[i].name, "x");
         }
 
-        dir_blk.dirArr[0].inum = first_empty_inum;
-        sprintf(dir_blk.dirArr[0].name, ".");
-        dir_blk.dirArr[1].inum = pinum;
-        sprintf(dir_blk.dirArr[1].name, "..");
+        dir_blk.dir_ent_loc[0].inum = first_empty_inum;
+        sprintf(dir_blk.dir_ent_loc[0].name, ".");
+        dir_blk.dir_ent_loc[1].inum = pinum;
+        sprintf(dir_blk.dir_ent_loc[1].name, "..");
 
-        write(fd, &dir_blk, sizeof(dir_t));
-        CR.endLog += sizeof(dir_t);
+        write(fd, &dir_blk, sizeof(MFS_Dir_t));
+        CR.endLog += sizeof(MFS_Dir_t);
     } else { // type is regular file
         new_inode.stat.size = 0;
         lseek(fd, CR.endLog, SEEK_SET);

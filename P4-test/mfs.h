@@ -31,15 +31,15 @@ typedef struct inode_t {
 
 // struct for inode map pieces
 // one inode map piece can point to 16 inodes
-typedef struct imap_t {
+typedef struct __MFS_imap_t {
     int inode_loc[16];
-} imap_t;
+} MFS_imap_t;
 
 // struct for directories
 // one directory block can have 128 entries
-typedef struct dir_t {
-    MFS_DirEnt_t dirArr[128];
-} dir_t;
+typedef struct __MFS_Dir_t {
+    MFS_DirEnt_t dir_ent_loc[128];
+} MFS_Dir_t;
 
 // struct to store all inode locations
 typedef struct __MFS_inode_loc_t {
