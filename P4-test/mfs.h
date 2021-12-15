@@ -32,7 +32,7 @@ typedef struct inode_t {
 // struct for inode map pieces
 // one inode map piece can point to 16 inodes
 typedef struct imap_t {
-    int inodeArr[16];
+    int inode_loc[16];
 } imap_t;
 
 // struct for directories
@@ -42,12 +42,12 @@ typedef struct dir_t {
 } dir_t;
 
 // struct to store all inode locations
-typedef struct inodeArr_t {
-    int inodeArr[4096];
-} inodeArr_t;
+typedef struct __MFS_inode_loc_t {
+    int inode_loc[4096];
+} MFS_inode_loc_t;
 
 //struct for different library calls
-typedef enum lib_t {
+typedef enum __MFS_Lib_t {
     INIT,
     LOOKUP,
     STAT,
@@ -56,7 +56,7 @@ typedef enum lib_t {
     CREAT,
     UNLINK,
     SHUTDOWN
-} lib_t;
+} MFS_Lib_t;
 
 //message struct, send between ports.
 typedef struct __MFS_Msg_t {
@@ -67,7 +67,7 @@ typedef struct __MFS_Msg_t {
     int block;
     int returnNum;
     MFS_Stat_t stat;
-    lib_t lib;
+    MFS_Lib_t lib;
 } MFS_Msg_t;
 
 int MFS_Init(char *hostname, int port);
