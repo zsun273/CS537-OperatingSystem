@@ -328,7 +328,7 @@ int server_stat(int inum, MFS_Stat_t *m) {
 
     // read in the inode
     MFS_inode_t inode;
-    lseek(fd, inode_location.inode_loc[inum], 0);
+    lseek(fd, inode_location, 0);
     read(fd, &inode, sizeof(MFS_inode_t));
 
     m->type = inode.stat.type;
@@ -432,12 +432,12 @@ int create_inode_imap(int pinum, int type) {
     lseek(fd, 0, SEEK_SET);
     read(fd, &CR, sizeof(MFS_CR_t));
 
-    MFS_imap_t imap_copy;
+    MFS_imap_t imap_tmp;
     for(int i = 0; i < 256; i++) {
         lseek(fd, CR.imap[i], SEEK_SET);
-        read(fd, &imap_copy, sizeof(MFS_imap_t));
+        read(fd, &imap_tmp, sizeof(MFS_imap_t));
         for(int j = 0; j < 16; j++) {
-            if(imap_copy.inode_loc[j] == -1) {
+            if(imap_tmp.inode_loc[j] == -1) {
                 first_empty_inum = i*256 + j;
                 break;
             }
