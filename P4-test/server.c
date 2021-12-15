@@ -415,7 +415,7 @@ int server_create(int pinum, int type, char *name) {
 }
 
 int create_inode_imap(int pinum, int type) {
-    load_inode_loc();
+    //load_inode_loc();
     // find first empty inode
     int first_empty_inum = -1;
     for(int i = 0; i < 4096; i++) {
